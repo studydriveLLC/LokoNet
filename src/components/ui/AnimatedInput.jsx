@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, Animated, StyleSheet, Platform } from 'react-native';
+import { View, TextInput, Animated, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { useAppTheme, spacing, typography, borderRadius } from '../../theme/theme';
 
 export default function AnimatedInput({ 
-  label, value, onChangeText, secureTextEntry, keyboardType, autoCapitalize, style 
+  label, value, onChangeText, isPassword, keyboardType, autoCapitalize, style 
 }) {
   const theme = useAppTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  
   const animatedIsFocused = useRef(new Animated.Value(value === '' ? 0 : 1)).current;
 
   useEffect(() => {
@@ -45,25 +48,41 @@ export default function AnimatedInput({
         styles.inputWrapper, 
         { borderColor, backgroundColor: theme.colors.surface }
       ]}>
-        {/* pointerEvents="none" empeche le label de bloquer le clic sur Web */}
         <Animated.Text style={labelStyle} pointerEvents="none">
           {label}
         </Animated.Text>
-        <TextInput
-          style={[
-            styles.input, 
-            { color: theme.colors.text },
-            Platform.OS === 'web' && { outlineStyle: 'none' } // Retire la bordure bleue web
-          ]}
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          secureTextEntry={secureTextEntry}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          selectionColor={theme.colors.primary}
-        />
+        
+        <View style={styles.inputRow}>
+          <TextInput
+            style={[
+              styles.input, 
+              { color: theme.colors.text },
+              Platform.OS === 'web' && { outlineStyle: 'none' }
+            ]}
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            secureTextEntry={isPassword && !showPassword}
+            keyboardType={keyboardType}
+            autoCapitalize={autoCapitalize}
+            selectionColor={theme.colors.primary}
+          />
+          
+          {isPassword && (
+            <TouchableOpacity 
+              style={styles.eyeIcon} 
+              onPress={() => setShowPassword(!showPassword)}
+              activeOpacity={0.7}
+            >
+              {showPassword ? (
+                <EyeOff size={20} color={theme.colors.textMuted} />
+              ) : (
+                <Eye size={20} color={theme.colors.textMuted} />
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
       </Animated.View>
     </View>
   );
@@ -81,10 +100,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingBottom: spacing.xs,
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   input: {
+    flex: 1,
     fontSize: typography.sizes.body,
     padding: 0,
     margin: 0,
     height: 24,
   },
+  eyeIcon: {
+    paddingHorizontal: spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
 });

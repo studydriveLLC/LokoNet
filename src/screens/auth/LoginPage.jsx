@@ -6,7 +6,8 @@ import {
   StyleSheet, 
   KeyboardAvoidingView, 
   Platform,
-  ScrollView
+  TouchableWithoutFeedback,
+  Keyboard
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,76 +48,85 @@ export default function LoginPage({ navigation }) {
     }
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer} 
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+  const renderContent = () => (
+    <KeyboardAvoidingView 
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+    >
+      <View style={styles.formContainer}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme.colors.primary }]}>StudyDrive</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
+            Connectez-vous pour accéder au campus.
+          </Text>
+        </View>
+
+        <AnimatedInput
+          label="Identifiant (Email, Pseudo, Tel)"
+          value={identifier}
+          onChangeText={setIdentifier}
+          autoCapitalize="none"
+        />
+
+        <AnimatedInput
+          label="Mot de passe"
+          value={password}
+          onChangeText={setPassword}
+          isPassword={true}
+        />
+
+        <TouchableOpacity 
+          style={styles.forgotPasswordButton} 
+          onPress={() => console.log('Mot de passe oublié cliqué')}
+          activeOpacity={0.6}
         >
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.colors.primary }]}>StudyDrive</Text>
-            <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-              Connectez-vous pour accéder au campus.
-            </Text>
-          </View>
+          <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>
+            Mot de passe oublié ?
+          </Text>
+        </TouchableOpacity>
 
-          <AnimatedInput
-            label="Identifiant (Email, Pseudo, Tel)"
-            value={identifier}
-            onChangeText={setIdentifier}
-            autoCapitalize="none"
+        <View style={styles.actionContainer}>
+          <AnimatedButton
+            title="Se connecter"
+            onPress={handleLogin}
+            isLoading={isLoading}
           />
+        </View>
 
-          <AnimatedInput
-            label="Mot de passe"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={true}
-          />
+        <TouchableOpacity 
+          style={styles.linkButton} 
+          onPress={() => navigation.navigate('Register')}
+          activeOpacity={0.6}
+        >
+          <Text style={[styles.linkText, { color: theme.colors.primary }]}>
+            Pas encore de compte ? S'inscrire
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
 
-          <View style={styles.actionContainer}>
-            <AnimatedButton
-              title="Se connecter"
-              onPress={handleLogin}
-              isLoading={isLoading}
-            />
-          </View>
+  if (Platform.OS === 'web') {
+    return renderContent();
+  }
 
-          <TouchableOpacity 
-            style={styles.linkButton} 
-            onPress={() => navigation.navigate('Register')}
-            activeOpacity={0.6}
-          >
-            <Text style={[styles.linkText, { color: theme.colors.primary }]}>
-              Pas encore de compte ? S'inscrire
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+  return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      {renderContent()}
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  keyboardView: { flex: 1 },
-  scrollContainer: { 
-    flexGrow: 1, 
-    justifyContent: 'center', 
-    paddingHorizontal: 32,
-    paddingTop: 80,
-    paddingBottom: 40
-  },
+  formContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
   header: { marginBottom: 48, alignItems: 'center' },
   title: { fontSize: 32, fontWeight: '700', marginBottom: 8, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, textAlign: 'center' },
-  actionContainer: { marginTop: 24 },
+  forgotPasswordButton: { alignSelf: 'flex-end', marginBottom: 24, marginTop: -8 },
+  forgotPasswordText: { fontSize: 14, fontWeight: '600' },
+  actionContainer: { marginTop: 8 },
   linkButton: { marginTop: 32, alignItems: 'center', padding: 12 },
   linkText: { fontSize: 16, fontWeight: '600' }
 });
