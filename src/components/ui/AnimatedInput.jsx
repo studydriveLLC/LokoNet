@@ -1,16 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, Animated, StyleSheet } from 'react-native';
-import { theme } from '../../theme/theme';
+import { View, TextInput, Animated, StyleSheet, Platform } from 'react-native';
+import { useAppTheme, spacing, typography, borderRadius } from '../../theme/theme';
 
 export default function AnimatedInput({ 
-  label, 
-  value, 
-  onChangeText, 
-  secureTextEntry, 
-  keyboardType, 
-  autoCapitalize, 
-  style 
+  label, value, onChangeText, secureTextEntry, keyboardType, autoCapitalize, style 
 }) {
+  const theme = useAppTheme();
   const [isFocused, setIsFocused] = useState(false);
   const animatedIsFocused = useRef(new Animated.Value(value === '' ? 0 : 1)).current;
 
@@ -24,14 +19,14 @@ export default function AnimatedInput({
 
   const labelStyle = {
     position: 'absolute',
-    left: theme.spacing.m,
+    left: spacing.m,
     top: animatedIsFocused.interpolate({
       inputRange: [0, 1],
-      outputRange: [20, theme.spacing.xs],
+      outputRange: [20, spacing.xs],
     }),
     fontSize: animatedIsFocused.interpolate({
       inputRange: [0, 1],
-      outputRange: [theme.typography.sizes.body, theme.typography.sizes.small],
+      outputRange: [typography.sizes.body, typography.sizes.small],
     }),
     color: animatedIsFocused.interpolate({
       inputRange: [0, 1],
@@ -46,10 +41,20 @@ export default function AnimatedInput({
 
   return (
     <View style={[styles.container, style]}>
-      <Animated.View style={[styles.inputWrapper, { borderColor }]}>
-        <Animated.Text style={labelStyle}>{label}</Animated.Text>
+      <Animated.View style={[
+        styles.inputWrapper, 
+        { borderColor, backgroundColor: theme.colors.surface }
+      ]}>
+        {/* pointerEvents="none" empeche le label de bloquer le clic sur Web */}
+        <Animated.Text style={labelStyle} pointerEvents="none">
+          {label}
+        </Animated.Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input, 
+            { color: theme.colors.text },
+            Platform.OS === 'web' && { outlineStyle: 'none' } // Retire la bordure bleue web
+          ]}
           value={value}
           onChangeText={onChangeText}
           onFocus={() => setIsFocused(true)}
@@ -57,6 +62,7 @@ export default function AnimatedInput({
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
+          selectionColor={theme.colors.primary}
         />
       </Animated.View>
     </View>
@@ -65,21 +71,18 @@ export default function AnimatedInput({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.m,
+    marginBottom: spacing.m,
   },
   inputWrapper: {
     borderWidth: 1.5,
-    borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: theme.spacing.m,
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.m,
     height: 64,
     justifyContent: 'flex-end',
-    paddingBottom: theme.spacing.xs,
-    ...theme.shadows.small,
+    paddingBottom: spacing.xs,
   },
   input: {
-    fontSize: theme.typography.sizes.body,
-    color: theme.colors.text,
+    fontSize: typography.sizes.body,
     padding: 0,
     margin: 0,
     height: 24,

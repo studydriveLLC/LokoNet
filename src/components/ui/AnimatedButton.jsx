@@ -1,26 +1,19 @@
 import React, { useRef } from 'react';
 import { Text, Animated, StyleSheet, TouchableWithoutFeedback, ActivityIndicator } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme, spacing, typography, borderRadius } from '../../theme/theme';
 
 export default function AnimatedButton({ title, onPress, isLoading, disabled, style }) {
+  const theme = useAppTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
     if (disabled || isLoading) return;
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
   };
 
   const handlePressOut = () => {
     if (disabled || isLoading) return;
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 4,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 40, useNativeDriver: true }).start();
   };
 
   return (
@@ -32,14 +25,15 @@ export default function AnimatedButton({ title, onPress, isLoading, disabled, st
     >
       <Animated.View style={[
         styles.button,
-        (disabled && !isLoading) && styles.buttonDisabled,
+        { backgroundColor: theme.colors.primary },
+        (disabled && !isLoading) && { backgroundColor: theme.colors.textDisabled },
         style,
         { transform: [{ scale: scaleAnim }] }
       ]}>
         {isLoading ? (
           <ActivityIndicator color={theme.colors.surface} />
         ) : (
-          <Text style={styles.text}>{title}</Text>
+          <Text style={[styles.text, { color: theme.colors.surface }]}>{title}</Text>
         )}
       </Animated.View>
     </TouchableWithoutFeedback>
@@ -48,21 +42,15 @@ export default function AnimatedButton({ title, onPress, isLoading, disabled, st
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.m,
-    borderRadius: theme.borderRadius.xl,
+    paddingVertical: spacing.m,
+    borderRadius: borderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center',
     height: 60,
-    ...theme.shadows.medium,
-  },
-  buttonDisabled: {
-    backgroundColor: theme.colors.textDisabled,
-    ...theme.shadows.none,
+    elevation: 4,
   },
   text: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.sizes.h4,
-    fontWeight: theme.typography.weights.bold,
+    fontSize: typography.sizes.h4,
+    fontWeight: typography.weights.bold,
   },
 });

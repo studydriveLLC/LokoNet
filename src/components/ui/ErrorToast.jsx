@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { hideErrorToast } from '../../store/slices/uiSlice';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from '../../theme/theme';
 
 export default function ErrorToast() {
   const dispatch = useDispatch();
+  const theme = useAppTheme();
   const { isVisible, message } = useSelector((state) => state.ui.errorToast);
   const translateY = useRef(new Animated.Value(-150)).current;
 
@@ -35,9 +37,9 @@ export default function ErrorToast() {
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
-      <SafeAreaView>
-        <View style={styles.toastBox}>
-          <Text style={styles.text}>{message}</Text>
+      <SafeAreaView edges={['top']}>
+        <View style={[styles.toastBox, { backgroundColor: theme.colors.error }]}>
+          <Text style={[styles.text, { color: theme.colors.surface }]}>{message}</Text>
         </View>
       </SafeAreaView>
     </Animated.View>
@@ -51,18 +53,16 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 9999,
-    paddingHorizontal: theme.spacing.m,
+    paddingHorizontal: 16,
   },
   toastBox: {
-    backgroundColor: theme.colors.error,
-    padding: theme.spacing.m,
-    borderRadius: theme.borderRadius.m,
-    ...theme.shadows.medium,
+    padding: 16,
+    borderRadius: 8,
+    elevation: 4,
   },
   text: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.sizes.body,
-    fontWeight: theme.typography.weights.medium,
+    fontSize: 16,
+    fontWeight: '500',
     textAlign: 'center',
   },
 });

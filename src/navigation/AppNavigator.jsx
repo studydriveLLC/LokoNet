@@ -1,22 +1,23 @@
 import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector, useDispatch } from 'react-redux';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { getToken } from '../store/secureStoreAdapter';
 import { setCredentials, setAuthLoading } from '../store/slices/authSlice';
+import { useAppTheme } from '../theme/theme';
 
-// Imports des ecrans
 import LoginPage from '../screens/auth/LoginPage';
 import RegisterPage from '../screens/auth/RegisterPage';
 import FeedScreen from '../screens/home/FeedScreen';
 
-// Composants globaux
 import ErrorToast from '../components/ui/ErrorToast';
+import TopInsetBox from '../components/ui/TopInsetBox';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
   const dispatch = useDispatch();
+  const theme = useAppTheme();
   const { isAuthenticated, isLoading } = useSelector((state) => state.auth);
 
   useEffect(() => {
@@ -38,29 +39,45 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2F80ED" />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <View style={[styles.mainWrapper, { backgroundColor: theme.colors.background }]}>
+      <TopInsetBox />
+      
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          animation: 'fade', // Remplacement par le fade-in fluide
+          gestureEnabled: false, // On désactive le glissement car ce n'est plus un slide
+        }}
+      >
         {!isAuthenticated ? (
-          // Groupe d'ecrans non connectes
           <>
             <Stack.Screen name="Login" component={LoginPage} />
             <Stack.Screen name="Register" component={RegisterPage} />
           </>
         ) : (
-          // Groupe d'ecrans connectes
           <Stack.Screen name="Feed" component={FeedScreen} />
         )}
       </Stack.Navigator>
       
-      {/* Toast d'erreur global instancie par-dessus la navigation */}
       <ErrorToast />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mainWrapper: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+  }
+});

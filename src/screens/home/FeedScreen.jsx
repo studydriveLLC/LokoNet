@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout } from '../../store/slices/authSlice';
 import { deleteToken } from '../../store/secureStoreAdapter';
-import { theme } from '../../theme/theme'; // Import du theme
+import { useAppTheme, spacing, typography, borderRadius } from '../../theme/theme';
 
 export default function FeedScreen() {
   const dispatch = useDispatch();
+  const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
   const user = useSelector((state) => state.auth.user);
 
   const handleLogout = async () => {
@@ -15,52 +18,81 @@ export default function FeedScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Flux d'actualite</Text>
-      <Text style={styles.subtitle}>
-        Connecte en tant que : {user?.pseudo || 'Utilisateur'}
-      </Text>
-      
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={handleLogout}
-        activeOpacity={0.8}
+    <View style={[styles.mainWrapper, { backgroundColor: theme.colors.background }]}>
+      <ScrollView 
+        contentContainerStyle={[
+          styles.scrollContainer, 
+          { paddingTop: insets.top + spacing.xl } // Padding dynamique sous la barre d'état
+        ]}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.buttonText}>Se deconnecter</Text>
-      </TouchableOpacity>
+        <Text style={[styles.title, { color: theme.colors.text }]}>Flux d'actualité</Text>
+        <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
+          Connecté en tant que : {user?.pseudo || 'Utilisateur'}
+        </Text>
+        
+        {/* Fausses cartes temporaires pour tester le scroll */}
+        {[1, 2, 3, 4].map((item) => (
+          <View 
+            key={item} 
+            style={[
+              styles.dummyPost, 
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }
+            ]}
+          >
+            <Text style={{ color: theme.colors.textMuted }}>Espace pour le post #{item}</Text>
+          </View>
+        ))}
+
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: theme.colors.error }]} 
+          onPress={handleLogout}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.buttonText, { color: theme.colors.surface }]}>Se déconnecter</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainWrapper: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.l,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.l,
+    paddingBottom: spacing.xxxl,
   },
   title: {
-    fontSize: theme.typography.sizes.h2,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.m,
+    fontSize: typography.sizes.h2,
+    fontWeight: typography.weights.bold,
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: theme.typography.sizes.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xl,
+    fontSize: typography.sizes.body,
+    marginBottom: spacing.xl,
+  },
+  dummyPost: {
+    height: 200,
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    marginBottom: spacing.m,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 1,
   },
   button: {
-    backgroundColor: theme.colors.error,
-    paddingHorizontal: theme.spacing.l,
-    paddingVertical: theme.spacing.m,
-    borderRadius: theme.borderRadius.m,
-    ...theme.shadows.small,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.m,
+    borderRadius: borderRadius.m,
+    elevation: 2,
+    alignItems: 'center',
   },
   buttonText: {
-    color: theme.colors.surface,
-    fontWeight: theme.typography.weights.bold,
-    fontSize: theme.typography.sizes.body,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.body,
   }
 });

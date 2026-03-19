@@ -4,12 +4,29 @@
     "slug": "studydrive",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.studydrive.app",
+      "userInterfaceStyle": "automatic"
     },
     "android": {
-      "package": "com.studydrive.app"
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.studydrive.app",
+      "userInterfaceStyle": "automatic",
+      "softwareKeyboardLayoutMode": "adjustResize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }
