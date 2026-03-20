@@ -6,6 +6,7 @@ import { getToken } from '../store/secureStoreAdapter';
 import { setCredentials, setAuthLoading } from '../store/slices/authSlice';
 import { useAppTheme } from '../theme/theme';
 
+import LandingPage from '../screens/auth/LandingPage';
 import LoginPage from '../screens/auth/LoginPage';
 import RegisterPage from '../screens/auth/RegisterPage';
 import MainTabNavigator from './MainTabNavigator';
@@ -58,8 +59,9 @@ export default function AppNavigator() {
       >
         {!isAuthenticated ? (
           <>
-            <Stack.Screen name="Login" component={LoginPage} />
+            <Stack.Screen name="Landing" component={LandingPage} />
             <Stack.Screen name="Register" component={RegisterPage} />
+            <Stack.Screen name="Login" component={LoginPage} />
           </>
         ) : (
           <Stack.Screen name="MainTabs" component={MainTabNavigator} />
