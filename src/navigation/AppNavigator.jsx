@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector, useDispatch } from 'react-redux';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
+// LA CORRECTION EST ICI : Import du GestureHandlerRootView
+import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
 import { getToken } from '../store/secureStoreAdapter';
 import { setCredentials, setAuthLoading } from '../store/slices/authSlice';
 import { useAppTheme } from '../theme/theme';
@@ -49,7 +51,8 @@ export default function AppNavigator() {
   }
 
   return (
-    <View style={[styles.mainWrapper, { backgroundColor: theme.colors.background }]}>
+    // LA CORRECTION EST ICI : On remplace <View> par <GestureHandlerRootView>
+    <GestureHandlerRootView style={[styles.mainWrapper, { backgroundColor: theme.colors.background }]}>
       <TopInsetBox />
       
       <Stack.Navigator 
@@ -81,7 +84,7 @@ export default function AppNavigator() {
       </Stack.Navigator>
       
       <ErrorToast />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
