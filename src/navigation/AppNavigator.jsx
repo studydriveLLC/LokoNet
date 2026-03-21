@@ -30,8 +30,6 @@ const fastSpringConfig = {
   },
 };
 
-const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL;
-
 export default function AppNavigator() {
   const dispatch = useDispatch();
   const theme = useAppTheme();
@@ -46,29 +44,10 @@ export default function AppNavigator() {
         if (token && userDataStr) {
           const savedUser = JSON.parse(userDataStr);
           
+          // 1. Connexion immédiate grâce au cache local (Plus aucun fetch manuel !)
           dispatch(setCredentials({ user: savedUser, token }));
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-          try {
-            const profileResponse = await fetch(`${rawBaseUrl}/v1/auth/me`, {
-              headers: { Authorization: `Bearer ${token}` },
-              signal: controller.signal,
-            });
-
-            clearTimeout(timeoutId);
-
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              dispatch(setCredentials({ user: profileData.data?.user || profileData.data, token }));
-            }
-            // FINIE LA DECONNEXION BRUTALE ICI ! On fait confiance a apiSlice et au Guardian pour gerer les 401
-          } catch (fetchError) {
-            clearTimeout(timeoutId);
-            console.warn('Backend injoignable. Session locale maintenue.');
-          }
         } else {
+          // Aucun token ou utilisateur en mémoire
           dispatch(setCredentials({ user: null, token: null }));
         }
       } catch (error) {
@@ -84,14 +63,7 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: theme.colors.background,
-        }}
-      >
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
@@ -101,7 +73,10 @@ export default function AppNavigator() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.mainWrapper, { backgroundColor: theme.colors.background }]}>
         <TopInsetBox />
+        
+        {/* Le Gardien veille en silence */}
         <TokenGuardian />
+        
         <Stack.Navigator
           screenOptions={{
             headerShown: false,
@@ -140,4 +115,5 @@ export default function AppNavigator() {
 
 const styles = StyleSheet.create({
   mainWrapper: { flex: 1 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

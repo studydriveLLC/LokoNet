@@ -34,6 +34,12 @@ export default function RessourcesScreen({ navigation }) {
     (r) => r.name === 'Main'
   )?.params?.user?._id;
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
   useEffect(() => {
     return () => {
       Object.values(activeIntervals.current).forEach(clearInterval);
@@ -44,19 +50,21 @@ export default function RessourcesScreen({ navigation }) {
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', (event) => {
       if (event.routeName !== 'Ressources') return;
+      
+      // 1. Scroll sécurisé (compatible avec toutes les versions de Reanimated)
       if (listRef.current) {
-        listRef.current.scrollToOffset({ offset: 0, animated: true });
+        if (typeof listRef.current.scrollToOffset === 'function') {
+          listRef.current.scrollToOffset({ offset: 0, animated: true });
+        } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
+          listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
+        }
       }
-      refetch();
+      
+      // 2. Feedback visuel de rafraîchissement
+      onRefresh();
     });
     return () => subscription.remove();
   }, [refetch]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
