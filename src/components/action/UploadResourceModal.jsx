@@ -105,11 +105,13 @@ export default function UploadResourceModal({ visible, onClose }) {
     setIsUploadSuccess(false);
     setUploadError('');
 
+    // METHODE YELY : Creation manuelle d'un vrai FormData
     const formData = new FormData();
     formData.append('title', title.trim());
     formData.append('category', category);
     formData.append('level', level);
     
+    // On s'assure que la cle correspond a upload.single('file') dans le backend
     formData.append('file', {
       uri: file.uri,
       name: file.name,
@@ -117,6 +119,7 @@ export default function UploadResourceModal({ visible, onClose }) {
     });
 
     try {
+      // On envoie le FormData directement
       await uploadResource(formData).unwrap();
       
       setIsUploadSuccess(true);
@@ -129,7 +132,7 @@ export default function UploadResourceModal({ visible, onClose }) {
 
     } catch (error) {
       console.log("[FRONTEND UPLOAD ERROR] Detail :", error);
-      const errorMessage = error?.data?.message || "Erreur réseau. Le fichier a été rejeté ou le délai a expiré.";
+      const errorMessage = error?.data?.message || "Erreur reseau. Le fichier a ete rejete ou le delai a expire.";
       setUploadError(errorMessage);
     }
   };
