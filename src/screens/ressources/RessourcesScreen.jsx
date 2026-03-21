@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +6,7 @@ import AnimatedHeader from '../../components/navigation/AnimatedHeader';
 import SkeletonResourceCard from '../../components/ressources/SkeletonResourceCard';
 import ResourceCard from '../../components/ressources/ResourceCard';
 import ResourceOptionsModal from '../../components/ressources/ResourceOptionsModal';
+import SmartRefreshOverlay from '../../components/ui/SmartRefreshOverlay';
 import { useAppTheme } from '../../theme/theme';
 import { useGetResourcesQuery, useDeleteResourceMutation } from '../../store/api/resourceApiSlice';
 
@@ -18,6 +19,7 @@ export default function RessourcesScreen({ navigation }) {
   const [downloads, setDownloads] = useState({});
   const [activeOptionsResource, setActiveOptionsResource] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isSmartRefreshing, setIsSmartRefreshing] = useState(false);
 
   const activeIntervals = useRef({});
   const resetTimeouts = useRef({});
@@ -34,6 +36,12 @@ export default function RessourcesScreen({ navigation }) {
     (r) => r.name === 'Main'
   )?.params?.user?._id;
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
   useEffect(() => {
     return () => {
       Object.values(activeIntervals.current).forEach(clearInterval);
@@ -43,32 +51,27 @@ export default function RessourcesScreen({ navigation }) {
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', async (event) => {
-      if (event.routeName === 'Ressources') {
-        try {
-          if (listRef.current) {
-            if (typeof listRef.current.scrollToOffset === 'function') {
-              listRef.current.scrollToOffset({ offset: 0, animated: true });
-            } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
-              listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
-            }
+      if (event.routeName !== 'Ressources') return;
+      
+      setIsSmartRefreshing(true);
+      
+      try {
+        if (listRef.current) {
+          if (typeof listRef.current.scrollToOffset === 'function') {
+            listRef.current.scrollToOffset({ offset: 0, animated: false });
+          } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
+            listRef.current.getNode().scrollToOffset({ offset: 0, animated: false });
           }
-        } catch (error) {
-          console.log('Erreur de scroll :', error);
         }
-        
-        setRefreshing(true);
-        await refetch();
-        setRefreshing(false);
+      } catch (error) {
+        console.log('Erreur de scroll native (ignoree) :', error);
       }
+      
+      await refetch();
+      setIsSmartRefreshing(false);
     });
     return () => subscription.remove();
   }, [refetch]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -165,6 +168,7 @@ export default function RessourcesScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AnimatedHeader scrollY={scrollY} title="Ressources" navigation={navigation} />
+      <SmartRefreshOverlay isVisible={isSmartRefreshing} />
 
       {isLoading ? (
         <Animated.FlatList

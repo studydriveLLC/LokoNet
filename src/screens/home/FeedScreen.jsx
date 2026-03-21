@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, DeviceEventEmitter, Text } from 'react-native';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { View, StyleSheet, DeviceEventEmitter, Text, RefreshControl } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScrollToTop } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import CommentsModal from '../../components/feed/CommentsModal';
 import PostDescriptionModal from '../../components/feed/PostDescriptionModal';
 import ShareModal from '../../components/feed/ShareModal';
 import PostOptionsModal from '../../components/feed/PostOptionsModal';
+import SmartRefreshOverlay from '../../components/ui/SmartRefreshOverlay';
 import { useGetFeedQuery, useToggleLikeMutation } from '../../store/api/postApiSlice';
 import { useAppTheme } from '../../theme/theme';
 
@@ -64,19 +65,20 @@ export default function FeedScreen({ navigation }) {
   const user = useSelector((state) => state.auth.user);
   const listRef = useRef(null);
 
-  // Pour la consistance avec RessourcesScreen
   useScrollToTop(listRef);
 
   const [activeCommentPost, setActiveCommentPost] = useState(null);
   const [activeDescPost, setActiveDescPost] = useState(null);
   const [activeSharePost, setActiveSharePost] = useState(null);
   const [activeOptionsPost, setActiveOptionsPost] = useState(null);
+  
+  const [refreshing, setRefreshing] = useState(false);
+  const [isSmartRefreshing, setIsSmartRefreshing] = useState(false);
 
   const {
     data: posts = [],
     isLoading,
     isError,
-    isFetching,
     refetch,
   } = useGetFeedQuery();
 
@@ -89,18 +91,32 @@ export default function FeedScreen({ navigation }) {
     },
   });
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', (event) => {
+    const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', async (event) => {
       if (event.routeName !== 'PourToi') return;
       
-      if (listRef.current) {
-        if (typeof listRef.current.scrollToOffset === 'function') {
-          listRef.current.scrollToOffset({ offset: 0, animated: true });
-        } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
-          listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
+      setIsSmartRefreshing(true);
+      
+      try {
+        if (listRef.current) {
+          if (typeof listRef.current.scrollToOffset === 'function') {
+            listRef.current.scrollToOffset({ offset: 0, animated: false }); // SCROLL INVISIBLE
+          } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
+            listRef.current.getNode().scrollToOffset({ offset: 0, animated: false });
+          }
         }
+      } catch (error) {
+        console.log('Erreur de scroll native (ignoree) :', error);
       }
-      refetch();
+      
+      await refetch();
+      setIsSmartRefreshing(false);
     });
     return () => subscription.remove();
   }, [refetch]);
@@ -139,7 +155,7 @@ export default function FeedScreen({ navigation }) {
           <Text style={[styles.errorText, { color: theme.colors.error }]}>
             Erreur lors du chargement
           </Text>
-          <Text style={[styles.retryText, { color: theme.colors.primary }]} onPress={refetch}>
+          <Text style={[styles.retryText, { color: theme.colors.primary }]} onPress={onRefresh}>
             Appuyez pour reessayer
           </Text>
         </View>
@@ -167,8 +183,13 @@ export default function FeedScreen({ navigation }) {
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        refreshing={isFetching}
-        onRefresh={refetch}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
         contentContainerStyle={{
           paddingTop: 140 + insets.top,
           paddingBottom: 100,
@@ -192,6 +213,7 @@ export default function FeedScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AnimatedHeader scrollY={scrollY} title="Pour Toi" navigation={navigation} />
+      <SmartRefreshOverlay isVisible={isSmartRefreshing} />
       {renderContent()}
 
       <CommentsModal

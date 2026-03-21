@@ -23,52 +23,40 @@ export default function LandingPage() {
   const navigation = useNavigation();
   const currentYear = new Date().getFullYear();
 
-  // Moteur de pulsation pour le bouton central (CTA)
   const pulseScale = useSharedValue(1);
 
   useEffect(() => {
-    // Initialisation de la pulsation infinie et douce
     pulseScale.value = withRepeat(
       withSequence(
         withTiming(1.04, { duration: 1200 }),
         withTiming(1, { duration: 1200 })
       ),
-      -1, // Infini
-      true // Reverse
+      -1,
+      true
     );
   }, [pulseScale]);
 
-  // Style animé du CTA (Scale + Liquid Glow interpolé)
   const animatedCtaStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
     shadowOpacity: interpolate(pulseScale.value, [1, 1.04], [0.15, 0.4]),
     shadowRadius: interpolate(pulseScale.value, [1, 1.04], [8, 16]),
   }));
 
-  // Gestionnaire générique d'ouverture de liens externes
   const handleOpenLink = async (url) => {
-    if (!url) {
-      console.warn("LandingPage: Tentative d'ouverture d'un lien undefined.");
-      return;
-    }
+    if (!url) return;
     try {
       const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.error(`LandingPage: Impossible d'ouvrir l'URL: ${url}`);
-      }
+      if (supported) await Linking.openURL(url);
     } catch (error) {
-      console.error("LandingPage: Erreur lors de l'ouverture du lien :", error);
+      console.error(error);
     }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Conteneur principal flexible gérant la répartition spatiale sans scroll */}
       <View style={styles.contentWrapper}>
         
-        {/* SECTION SUPERIEURE (Header) */}
+        {/* HEADER */}
         <Animated.View entering={FadeInDown.duration(800).delay(100)} style={styles.topNav}>
           <MagneticWrapper>
             <View style={styles.navButton}>
@@ -85,30 +73,23 @@ export default function LandingPage() {
           </MagneticWrapper>
         </Animated.View>
 
-        {/* SECTION CENTRALE (Contenu) */}
+        {/* CENTER */}
         <View style={styles.centerContent}>
-          <Animated.View 
-            // Apparition douce : fondu vertical lent sans rebond
-            entering={FadeInDown.duration(1200).delay(300)} 
-            style={styles.brandContainer}
-          >
+          <Animated.View entering={FadeInDown.duration(1200).delay(300)} style={styles.brandContainer}>
             <Text style={[styles.title, { color: theme.colors.primary }]}>LokoDrive</Text>
             <Text style={[styles.subtitle, { color: theme.colors.text }]}>
-              La plateforme ultime pour unifier la communauté estudiantine.
+              La plateforme ultime pour connecter et faire grandir la communauté étudiante.
             </Text>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(1200).delay(500)} style={styles.descriptionContainer}>
             <Text style={[styles.description, { color: theme.colors.textMuted }]}>
-              Né d'une volonté de centraliser l'entraide, LokoDrive n'est pas qu'une simple application. 
-              C'est un espace collaboratif pensé par des étudiants, pour des étudiants. 
-              Partagez vos ressources, interagissez et évoluez ensemble.
+              Née d’une volonté de centraliser l’entraide, LokoDrive est bien plus qu’une simple application.
+              C’est un espace collaboratif, conçu par des étudiants, pour des étudiants.
             </Text>
           </Animated.View>
 
-          {/* SECTION D'ACTION (Boutons) */}
           <Animated.View entering={FadeInUp.duration(1000).delay(700)} style={styles.actionContainer}>
-            {/* Conteneur animé pour la pulsation et le glow */}
             <Animated.View style={[styles.ctaWrapper, theme.shadows.medium, animatedCtaStyle]}>
               <Pressable 
                 style={[styles.primaryButton, { backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.xl }]}
@@ -120,10 +101,7 @@ export default function LandingPage() {
               </Pressable>
             </Animated.View>
 
-            <Pressable 
-              style={styles.secondaryButton}
-              onPress={() => navigation.navigate('Login')}
-            >
+            <Pressable onPress={() => navigation.navigate('Login')}>
               <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
                 Déjà membre ? <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Se connecter</Text>
               </Text>
@@ -131,24 +109,34 @@ export default function LandingPage() {
           </Animated.View>
         </View>
 
-        {/* SECTION INFERIEURE (Footer) */}
+        {/* FOOTER */}
         <Animated.View entering={FadeInUp.duration(800).delay(900)} style={[styles.footer, { borderTopColor: theme.colors.divider }]}>
           <View style={styles.socialContainer}>
+
             <MagneticWrapper onPress={() => handleOpenLink(process.env.EXPO_PUBLIC_FACEBOOK_LINK)}>
-              <Facebook size={24} color={theme.colors.textMuted} />
+              <View style={styles.iconWrapper}>
+                <Facebook size={22} color={theme.colors.textMuted} />
+              </View>
             </MagneticWrapper>
-            
+
             <MagneticWrapper onPress={() => handleOpenLink(process.env.EXPO_PUBLIC_INSTAGRAM_LINK)}>
-              <Instagram size={24} color={theme.colors.textMuted} />
+              <View style={styles.iconWrapper}>
+                <Instagram size={22} color={theme.colors.textMuted} />
+              </View>
             </MagneticWrapper>
 
             <MagneticWrapper onPress={() => handleOpenLink(process.env.EXPO_PUBLIC_TIKTOK_LINK)}>
-              <TikTokIcon size={24} color={theme.colors.textMuted} />
+              <View style={styles.iconWrapper}>
+                <TikTokIcon size={20} color={theme.colors.textMuted} />
+              </View>
             </MagneticWrapper>
 
             <MagneticWrapper onPress={() => handleOpenLink(process.env.EXPO_PUBLIC_WHATSAPP_LINK)}>
-              <WhatsAppIcon size={24} color={theme.colors.textMuted} />
+              <View style={styles.iconWrapper}>
+                <WhatsAppIcon size={22} color={theme.colors.textMuted} />
+              </View>
             </MagneticWrapper>
+
           </View>
           
           <Text style={[styles.copyright, { color: theme.colors.textDisabled }]}>
@@ -168,13 +156,12 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     paddingHorizontal: 24,
-    // justifySpaceBetween assure la répartition Haut/Centre/Bas pour éviter le scroll
     justifyContent: 'space-between', 
   },
   topNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 60, // Maintien de l'espacement UX validé précédemment
+    paddingTop: 60,
   },
   navButton: {
     flexDirection: 'row',
@@ -220,7 +207,6 @@ const styles = StyleSheet.create({
   },
   ctaWrapper: {
     width: '100%',
-    // Ombre forcée sur la couleur primaire pour l'effet Liquid Glow
     shadowColor: '#5170FF', 
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
@@ -236,9 +222,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  secondaryButton: {
-    padding: 10,
-  },
   secondaryButtonText: {
     fontSize: 16,
   },
@@ -250,8 +233,18 @@ const styles = StyleSheet.create({
   },
   socialContainer: {
     flexDirection: 'row',
-    gap: 32,
+    gap: 28,
   },
+
+  // 🔥 LA CLÉ DU FIX
+  iconWrapper: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+
   copyright: {
     fontSize: 12,
   },
