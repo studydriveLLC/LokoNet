@@ -73,8 +73,9 @@ export default function BottomSheet({ isVisible, onClose, children, footer }) {
     onCloseRef.current();
   }, []);
 
+  // CORRECTION CRITIQUE : activeOffsetY([-15, 15]) permet aux clics de passer
   const panGesture = Gesture.Pan()
-    .activeOffsetY([15, 15])
+    .activeOffsetY([-15, 15])
     .failOffsetX([-20, 20])
     .onUpdate((e) => {
       if (e.translationY > 0) {
@@ -124,7 +125,7 @@ export default function BottomSheet({ isVisible, onClose, children, footer }) {
         >
           <View style={styles.header}>
             <View style={[styles.dragHandle, { backgroundColor: theme.colors.border }]} />
-            <Pressable onPress={handleClose} style={styles.closeButton} hitSlop={15}>
+            <Pressable onPress={handleClose} style={styles.closeButton} hitSlop={25}>
               <X color={theme.colors.text} size={24} />
             </Pressable>
           </View>
@@ -169,9 +170,9 @@ const styles = StyleSheet.create({
     elevation: 10,
     overflow: 'hidden',
   },
-  header: { height: 40, alignItems: 'center', justifyContent: 'center' },
-  dragHandle: { width: 40, height: 5, borderRadius: 3, marginTop: 10 },
-  closeButton: { position: 'absolute', right: 20, top: 10 },
+  header: { height: 50, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  dragHandle: { width: 40, height: 5, borderRadius: 3, marginTop: 5 },
+  closeButton: { position: 'absolute', right: 20, top: 10, zIndex: 100, padding: 5 },
   scrollContent: { paddingBottom: 20 },
   footerContainer: {
     borderTopWidth: 1,

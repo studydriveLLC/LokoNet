@@ -30,6 +30,18 @@ const fastSpringConfig = {
   },
 };
 
+// Configuration de l'animation Fade In immersive pour le Menu
+const fadeTimingConfig = {
+  animation: 'timing',
+  config: { duration: 250 },
+};
+
+const immersiveFadeInterpolator = ({ current }) => ({
+  cardStyle: {
+    opacity: current.progress,
+  },
+});
+
 export default function AppNavigator() {
   const dispatch = useDispatch();
   const theme = useAppTheme();
@@ -44,10 +56,10 @@ export default function AppNavigator() {
         if (token && userDataStr) {
           const savedUser = JSON.parse(userDataStr);
           
-          // 1. Connexion immédiate grâce au cache local (Plus aucun fetch manuel !)
+          // 1. Connexion immediate grace au cache local (Plus aucun fetch manuel !)
           dispatch(setCredentials({ user: savedUser, token }));
         } else {
-          // Aucun token ou utilisateur en mémoire
+          // Aucun token ou utilisateur en memoire
           dispatch(setCredentials({ user: null, token: null }));
         }
       } catch (error) {
@@ -102,6 +114,12 @@ export default function AppNavigator() {
                 options={{
                   gestureEnabled: false,
                   cardStyle: { backgroundColor: theme.colors.background },
+                  // On ecrase le comportement global pour le Menu avec notre Fade
+                  transitionSpec: {
+                    open: fadeTimingConfig,
+                    close: fadeTimingConfig,
+                  },
+                  cardStyleInterpolator: immersiveFadeInterpolator,
                 }}
               />
             </>

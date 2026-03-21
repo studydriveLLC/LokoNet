@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Platform } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler'; // IMPORT CRITIQUE
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Platform } from 'react-native';
 import { FileUp, X, File, CheckCircle2 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, withSequence } from 'react-native-reanimated';
@@ -62,7 +61,6 @@ export default function UploadResourceModal({ visible, onClose }) {
     setIsUploadSuccess(false);
     
     try {
-      // FIX ULTIME POUR ANDROID : On demande tout nativement, on verifie en JS ensuite
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*', 
         copyToCacheDirectory: true,
@@ -140,8 +138,7 @@ export default function UploadResourceModal({ visible, onClose }) {
   const renderFooter = () => (
     <View style={[styles.footer, { backgroundColor: theme.colors.background, borderTopColor: theme.colors.divider }]}>
       {uploadError ? <Text style={[styles.errorText, { color: theme.colors.error || 'red' }]}>{uploadError}</Text> : null}
-      <TouchableOpacity 
-        activeOpacity={0.8}
+      <Pressable 
         style={[styles.submitButton, { backgroundColor: isFormValid ? theme.colors.primary : theme.colors.primaryLight }]}
         disabled={!isFormValid || isLoading}
         onPress={handleUpload}
@@ -152,7 +149,7 @@ export default function UploadResourceModal({ visible, onClose }) {
         <Text style={[styles.submitText, { color: isFormValid ? theme.colors.surface : theme.colors.textDisabled }]}>
           {isLoading ? "Envoi en cours..." : "Partager le document"}
         </Text>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 
@@ -162,8 +159,7 @@ export default function UploadResourceModal({ visible, onClose }) {
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Partager une ressource</Text>
         
         {!file ? (
-          <TouchableOpacity 
-            activeOpacity={0.6}
+          <Pressable 
             style={[styles.uploadZone, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderStyle: 'dashed', borderWidth: 2 }]}
             onPress={handlePickFile}
           >
@@ -172,7 +168,7 @@ export default function UploadResourceModal({ visible, onClose }) {
             </View>
             <Text style={[styles.uploadText, { color: theme.colors.text }]}>Appuyez pour selectionner</Text>
             <Text style={[styles.uploadSub, { color: theme.colors.textMuted }]}>PDF, DOCX, XLSX, JPG, PNG (Max 15 MB)</Text>
-          </TouchableOpacity>
+          </Pressable>
         ) : (
           <View style={[styles.fileCard, { backgroundColor: theme.colors.primaryLight, borderColor: theme.colors.primary }]}>
             <View style={styles.fileIconBox}>
@@ -183,9 +179,9 @@ export default function UploadResourceModal({ visible, onClose }) {
               <Text style={[styles.fileSize, { color: theme.colors.primary }]}>{file.size} MB</Text>
             </View>
             {!isLoading && (
-              <TouchableOpacity onPress={() => setFile(null)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}} style={styles.removeFileBtn}>
+              <Pressable onPress={() => setFile(null)} hitSlop={20} style={styles.removeFileBtn}>
                 <X color={theme.colors.primaryDark} size={20} />
-              </TouchableOpacity>
+              </Pressable>
             )}
             {isUploadSuccess && (
               <CheckCircle2 color={theme.colors.primaryDark} size={24} />
@@ -209,8 +205,7 @@ export default function UploadResourceModal({ visible, onClose }) {
           <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Niveau d'etude</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillContainer}>
             {LEVELS.map((lvl) => (
-              <TouchableOpacity 
-                activeOpacity={0.7}
+              <Pressable 
                 key={lvl} 
                 style={[styles.pill, { 
                   backgroundColor: level === lvl ? theme.colors.primary : theme.colors.surface,
@@ -221,7 +216,7 @@ export default function UploadResourceModal({ visible, onClose }) {
                 <Text style={[styles.pillText, { color: level === lvl ? theme.colors.surface : theme.colors.text }]}>
                   {lvl}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </ScrollView>
         </View>
@@ -230,8 +225,7 @@ export default function UploadResourceModal({ visible, onClose }) {
           <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Categorie</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillContainer}>
             {CATEGORIES.map((cat) => (
-              <TouchableOpacity 
-                activeOpacity={0.7}
+              <Pressable 
                 key={cat} 
                 style={[styles.pill, { 
                   backgroundColor: category === cat ? theme.colors.primary : theme.colors.surface,
@@ -242,7 +236,7 @@ export default function UploadResourceModal({ visible, onClose }) {
                 <Text style={[styles.pillText, { color: category === cat ? theme.colors.surface : theme.colors.text }]}>
                   {cat}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </ScrollView>
         </View>

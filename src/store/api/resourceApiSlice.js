@@ -16,6 +16,9 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
       transformResponse: (response) => {
         return response.data?.resources || [];
       },
+      // RESILIENCE RESEAU : Garde en cache frontend pendant 5 minutes.
+      // Évite les rechargements inutiles si le réseau vacille.
+      keepUnusedDataFor: 300, 
       providesTags: (result) =>
         result
           ? [
@@ -27,6 +30,7 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
     getResource: builder.query({
       query: (id) => ({ url: `/v1/resources/${id}` }),
       transformResponse: (response) => response.data?.resource,
+      keepUnusedDataFor: 300,
       providesTags: (result, error, id) => [{ type: 'Resource', id }],
     }),
     uploadResource: builder.mutation({
