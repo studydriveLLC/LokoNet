@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Keyboard, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Keyboard, Platform, BackHandler } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -73,7 +74,21 @@ export default function BottomSheet({ isVisible, onClose, children, footer }) {
     onCloseRef.current();
   }, []);
 
-  // CORRECTION CRITIQUE : activeOffsetY([-15, 15]) permet aux clics de passer
+  // INTERCEPTION DU BOUTON RETOUR PHYSIQUE ANDROID
+  useEffect(() => {
+    const onBackPress = () => {
+      if (isVisible) {
+        handleClose();
+        return true; // Bloque le comportement natif (retour en arriere)
+      }
+      return false; // Laisse passer le comportement natif
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => backHandler.remove();
+  }, [isVisible, handleClose]);
+
   const panGesture = Gesture.Pan()
     .activeOffsetY([-15, 15])
     .failOffsetX([-20, 20])

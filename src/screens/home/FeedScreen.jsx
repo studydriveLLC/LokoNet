@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, DeviceEventEmitter, Text, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, DeviceEventEmitter, Text } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScrollToTop } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import AnimatedHeader from '../../components/navigation/AnimatedHeader';
 import PostCard from '../../components/feed/PostCard';
+import SkeletonPostCard from '../../components/feed/SkeletonPostCard';
 import CommentsModal from '../../components/feed/CommentsModal';
 import PostDescriptionModal from '../../components/feed/PostDescriptionModal';
 import ShareModal from '../../components/feed/ShareModal';
@@ -62,6 +64,9 @@ export default function FeedScreen({ navigation }) {
   const user = useSelector((state) => state.auth.user);
   const listRef = useRef(null);
 
+  // Pour la consistance avec RessourcesScreen
+  useScrollToTop(listRef);
+
   const [activeCommentPost, setActiveCommentPost] = useState(null);
   const [activeDescPost, setActiveDescPost] = useState(null);
   const [activeSharePost, setActiveSharePost] = useState(null);
@@ -84,7 +89,6 @@ export default function FeedScreen({ navigation }) {
     },
   });
 
-  // Smart tab press - refresh + scroll to top securise
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', (event) => {
       if (event.routeName !== 'PourToi') return;
@@ -96,7 +100,6 @@ export default function FeedScreen({ navigation }) {
           listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
         }
       }
-      
       refetch();
     });
     return () => subscription.remove();
@@ -117,12 +120,16 @@ export default function FeedScreen({ navigation }) {
   const renderContent = () => {
     if (isLoading && !posts.length) {
       return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={[styles.loadingText, { color: theme.colors.textMuted }]}>
-            Chargement du feed...
-          </Text>
-        </View>
+        <Animated.FlatList
+          data={[1, 2, 3]}
+          keyExtractor={(item) => item.toString()}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingTop: 140 + insets.top,
+            paddingBottom: 100,
+          }}
+          renderItem={() => <SkeletonPostCard />}
+        />
       );
     }
 
@@ -226,7 +233,6 @@ const styles = StyleSheet.create({
     paddingTop: 140,
     paddingHorizontal: 32,
   },
-  loadingText: { marginTop: 16, fontSize: 16 },
   errorText: { fontSize: 18, fontWeight: '600', textAlign: 'center' },
   retryText: { marginTop: 12, fontSize: 16, fontWeight: '500' },
   emptyText: { fontSize: 18, fontWeight: '600', textAlign: 'center' },
