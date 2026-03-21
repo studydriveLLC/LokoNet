@@ -1,70 +1,67 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import PostHeader from './PostHeader';
-import PostContent from './PostContent';
-import PostActions from './PostActions';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Heart, MessageCircle, Share2 } from 'lucide-react-native';
 import { useAppTheme } from '../../theme/theme';
 
-export default function PostCard({
-  post,
-  currentUserId,
-  onOpenComments,
-  onOpenDescription,
-  onOpenShare,
-  onOpenOptions,
-  onLike,
-  onDelete,
+export default function PostActions({
+  likesCount,
+  commentsCount,
+  sharesCount,
+  isLikedByMe,
+  onCommentPress,
+  onSharePress,
+  onLikePress,
 }) {
   const theme = useAppTheme();
 
   return (
-    <View style={[
-      styles.card,
-      {
-        backgroundColor: theme.colors.surface,
-        borderColor: theme.colors.border,
-      }
-    ]}>
-      <View style={styles.internalPadding}>
-        <PostHeader
-          author={post.author}
-          date={post.date}
-          description={post.description}
-          onReadMore={() => onOpenDescription && onOpenDescription(post)}
-          onOptionsPress={() => onOpenOptions && onOpenOptions(post)}
-        />
-      </View>
-
-      <PostContent
-        media={post.media}
-        onPress={() => console.log("Ouvrir le visualiseur de media plein ecran")}
+    <View style={styles.container}>
+      <ActionItem
+        icon={<Heart size={20} color={isLikedByMe ? theme.colors.error : theme.colors.textMuted} fill={isLikedByMe ? theme.colors.error : 'transparent'} />}
+        count={likesCount}
+        onPress={onLikePress}
+        theme={theme}
       />
-
-      <View style={styles.internalPadding}>
-        <PostActions
-          likesCount={post.likes}
-          commentsCount={post.comments}
-          sharesCount={post.shares}
-          isLikedByMe={post.isLikedByMe}
-          onCommentPress={() => onOpenComments && onOpenComments(post)}
-          onSharePress={() => onOpenShare && onOpenShare(post)}
-          onLikePress={() => onLike && onLike(post._id)}
-        />
-      </View>
+      <ActionItem
+        icon={<MessageCircle size={20} color={theme.colors.textMuted} />}
+        count={commentsCount}
+        onPress={onCommentPress}
+        theme={theme}
+      />
+      <ActionItem
+        icon={<Share2 size={20} color={theme.colors.textMuted} />}
+        count={sharesCount}
+        onPress={onSharePress}
+        theme={theme}
+      />
     </View>
   );
 }
 
+const ActionItem = ({ icon, count, onPress, theme }) => (
+  <Pressable style={styles.actionButton} onPress={onPress}>
+    {icon}
+    <Text style={[styles.actionText, { color: theme.colors.textMuted }]}>
+      {count > 0 ? count : '0'}
+    </Text>
+  </Pressable>
+);
+
 const styles = StyleSheet.create({
-  card: {
-    marginBottom: 12,
-    paddingTop: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingVertical: 12,
+    gap: 24,
   },
-  internalPadding: {
-    paddingHorizontal: 16,
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '500',
   }
 });
