@@ -9,8 +9,18 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
   
   if (!resourceUrl) return null;
 
-  const isImage = resourceUrl.match(/\.(jpeg|jpg|png|gif)$/i) || resourceUrl.includes('image');
-  const viewerUrl = isImage ? resourceUrl : `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(resourceUrl)}`;
+  const secureUrl = resourceUrl.replace('http://', 'https://');
+  const isImage = secureUrl.match(/\.(jpeg|jpg|png|gif)$/i) || secureUrl.includes('image');
+  const isOfficeDoc = secureUrl.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i);
+  
+  let viewerUrl = secureUrl;
+  if (!isImage) {
+    if (isOfficeDoc) {
+      viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(secureUrl)}`;
+    } else {
+      viewerUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(secureUrl)}`;
+    }
+  }
 
   return (
     <BottomSheet isVisible={visible} onClose={onClose}>
@@ -28,12 +38,19 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
+            mixedContentMode="always"
+            thirdPartyCookiesEnabled={true}
+            sharedCookiesEnabled={true}
             originWhitelist={['*']}
             renderLoading={() => (
               <View style={styles.loader}>
                 <ActivityIndicator size="large" color={theme.colors.primary} />
               </View>
             )}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.log('Erreur silencieuse WebView: ', nativeEvent);
+            }}
           />
         )}
       </View>

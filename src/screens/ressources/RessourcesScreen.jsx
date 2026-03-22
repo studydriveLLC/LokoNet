@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl }
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
-import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import AnimatedHeader from '../../components/navigation/AnimatedHeader';
@@ -59,9 +58,13 @@ export default function RessourcesScreen({ navigation }) {
     const setupSockets = async () => {
       socket = await socketService.connect();
       
-      socket.on('newResource', () => {
+      const handleNewResource = (data) => {
+        console.log('[Sockets] Nouvelle ressource detectee !', data);
         refetch();
-      });
+      };
+
+      socket.on('newResource', handleNewResource);
+      socket.on('new_resource', handleNewResource);
 
       socket.on('resourceStatsUpdated', (data) => {
         setLocalStats(prev => ({
@@ -76,6 +79,7 @@ export default function RessourcesScreen({ navigation }) {
     return () => {
       if (socket) {
         socket.off('newResource');
+        socket.off('new_resource');
         socket.off('resourceStatsUpdated');
       }
     };
@@ -89,13 +93,15 @@ export default function RessourcesScreen({ navigation }) {
       isFetchingRef.current = true;
       setIsSmartRefreshing(true);
       
-      if (listRef.current) {
-        if (typeof listRef.current.scrollToOffset === 'function') {
-          listRef.current.scrollToOffset({ offset: 0, animated: true });
-        } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
-          listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
+      setTimeout(() => {
+        if (listRef.current) {
+          if (typeof listRef.current.scrollToOffset === 'function') {
+            listRef.current.scrollToOffset({ offset: 0, animated: true });
+          } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
+            listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
+          }
         }
-      }
+      }, 150);
       
       let isTimeout = false;
       const safetyTimer = setTimeout(() => {
@@ -107,7 +113,7 @@ export default function RessourcesScreen({ navigation }) {
       try {
         await refetch();
       } catch (error) {
-        console.log('Erreur silencieuse', error);
+        console.log('Erreur silencieuse refetch', error);
       } finally {
         clearTimeout(safetyTimer);
         if (!isTimeout) {
@@ -150,7 +156,7 @@ export default function RessourcesScreen({ navigation }) {
           toolbarColor: theme.colors.background,
         });
       } catch (error) {
-        console.log('Erreur ouverture:', error);
+        console.log('Erreur ouverture WebBrowser:', error);
       }
     }
   };
@@ -163,10 +169,13 @@ export default function RessourcesScreen({ navigation }) {
     setDownloads(prev => ({ ...prev, [resource._id]: { status: 'downloading', progress: 0 } }));
 
     try {
-      const fileName = `${resource.title.replace(/[^a-zA-Z0-9]/g, '_')}.${resource.format}`;
-      const fileUri = FileSystem.documentDirectory + fileName;
+      const safeTitle = (resource.title || 'Document_LokoDrive').replace(/[^a-zA-Z0-9]/g, '_');
+      const ext = resource.format || 'pdf';
+      const fileName = `${safeTitle}.${ext}`;
+      
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
-      const downloadResumable = FileSystemLegacy.createDownloadResumable(
+      const downloadResumable = FileSystem.createDownloadResumable(
         fileUrl,
         fileUri,
         {},
@@ -192,7 +201,7 @@ export default function RessourcesScreen({ navigation }) {
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(result.uri, {
             mimeType: 'application/octet-stream',
-            dialogTitle: 'Enregistrer ou Partager',
+            dialogTitle: 'Enregistrer le document',
           });
         }
         setTimeout(() => {
@@ -200,7 +209,7 @@ export default function RessourcesScreen({ navigation }) {
         }, 3000);
       }
     } catch (error) {
-      console.log('Erreur telechargement:', error);
+      console.log('Erreur telechargement native:', error);
       setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
     }
   };
