@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl, Platform } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// Importation corrigée pour le SDK 54 d'Expo
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
@@ -65,33 +64,17 @@ export default function RessourcesScreen({ navigation }) {
       isFetchingRef.current = true;
       setIsSmartRefreshing(true);
       
-      setTimeout(() => {
-        try {
-          if (listRef.current) {
-            listRef.current.scrollToOffset({ offset: 0, animated: true });
-          }
-        } catch (error) {
-          console.log('Erreur silencieuse scroll', error);
-        }
-      }, 100);
-      
-      let isTimeout = false;
-      const safetyTimer = setTimeout(() => {
-        isTimeout = true;
-        setIsSmartRefreshing(false);
-        isFetchingRef.current = false;
-      }, 8000);
+      if (listRef.current) {
+        listRef.current.scrollToOffset({ offset: 0, animated: false });
+      }
       
       try {
         await refetch();
       } catch (error) {
         console.log('Erreur silencieuse refetch', error);
       } finally {
-        clearTimeout(safetyTimer);
-        if (!isTimeout) {
-          setIsSmartRefreshing(false);
-          isFetchingRef.current = false;
-        }
+        setIsSmartRefreshing(false);
+        isFetchingRef.current = false;
       }
     });
     return () => subscription.remove();
@@ -140,7 +123,8 @@ export default function RessourcesScreen({ navigation }) {
     
     if (downloads[resource._id]?.status === 'downloading') return;
 
-    if (!fileUrl.startsWith('http')) {
+    const isLocal = !fileUrl.startsWith('http');
+    if (isLocal) {
       const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000';
       fileUrl = `${rawBaseUrl.replace(/\/$/, '')}/${fileUrl.replace(/^\//, '')}`;
     }
@@ -151,48 +135,67 @@ export default function RessourcesScreen({ navigation }) {
       const safeTitle = (resource.title || 'Document_LokoNet').replace(/[^a-zA-Z0-9]/g, '_');
       const ext = resource.format || 'pdf';
       const fileName = `${safeTitle}.${ext}`;
-      
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
-      const downloadResumable = FileSystem.createDownloadResumable(
-        fileUrl,
-        fileUri,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        },
-        (downloadProgress) => {
-          const progress = (downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100;
-          setDownloads(prev => ({
-            ...prev,
-            [resource._id]: { status: 'downloading', progress: isNaN(progress) ? 50 : progress },
-          }));
-        }
-      );
-
-      const result = await downloadResumable.downloadAsync();
-
-      if (result && result.uri) {
-        if (result.status && result.status >= 400) {
-          throw new Error(`Erreur serveur HTTP ${result.status}`);
-        }
-
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(result.uri, { 
-            dialogTitle: 'Enregistrer le document',
-            UTI: 'public.item', 
-            mimeType: 'application/octet-stream'
-          });
-        }
-
-        setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
-        await logDownload(resource._id).unwrap();
-
-        setTimeout(() => {
-          setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
-        }, 3000);
+      const options = {};
+      if (isLocal || fileUrl.includes(process.env.EXPO_PUBLIC_API_URL)) {
+        options.headers = { Authorization: `Bearer ${token}` };
       }
+
+      if (Platform.OS === 'android') {
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) {
+          setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
+          return;
+        }
+
+        const downloadResumable = FileSystem.createDownloadResumable(
+          fileUrl, fileUri, options,
+          (progressEvent) => {
+            const progress = (progressEvent.totalBytesWritten / progressEvent.totalBytesExpectedToWrite) * 100;
+            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'downloading', progress: isNaN(progress) ? 50 : progress } }));
+          }
+        );
+
+        const result = await downloadResumable.downloadAsync();
+
+        if (result && result.status < 400) {
+          const base64Data = await FileSystem.readAsStringAsync(result.uri, { encoding: FileSystem.EncodingType.Base64 });
+          const savedUri = await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/octet-stream');
+          await FileSystem.writeAsStringAsync(savedUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+          await FileSystem.deleteAsync(result.uri, { idempotent: true });
+
+          setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
+          await logDownload(resource._id).unwrap();
+        } else {
+          throw new Error(`Erreur serveur HTTP ${result?.status}`);
+        }
+      } else {
+        const downloadResumable = FileSystem.createDownloadResumable(
+          fileUrl, fileUri, options,
+          (progressEvent) => {
+            const progress = (progressEvent.totalBytesWritten / progressEvent.totalBytesExpectedToWrite) * 100;
+            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'downloading', progress: isNaN(progress) ? 50 : progress } }));
+          }
+        );
+
+        const result = await downloadResumable.downloadAsync();
+
+        if (result && result.status < 400) {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(result.uri, { dialogTitle: 'Enregistrer le document', UTI: 'public.item' });
+          }
+          setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
+          await logDownload(resource._id).unwrap();
+        } else {
+          throw new Error(`Erreur serveur HTTP ${result?.status}`);
+        }
+      }
+
+      setTimeout(() => {
+        setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
+      }, 3000);
+
     } catch (error) {
       console.log('Erreur telechargement native:', error);
       setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));

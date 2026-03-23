@@ -17,8 +17,6 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
   if (!resourceUrl) return null;
 
   const secureUrl = resourceUrl.replace('http://', 'https://');
-  
-  // Isoler le chemin du fichier sans les parametres d'URL pour valider l'extension
   const urlWithoutParams = secureUrl.split('?')[0];
 
   const isImage = urlWithoutParams.match(/\.(jpeg|jpg|png|gif)$/i) || secureUrl.includes('image');
@@ -29,11 +27,10 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
   if (!isImage) {
     if (isOfficeDoc) {
       viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(secureUrl)}`;
-    } else if (isPdf && Platform.OS === 'ios') {
-      viewerUrl = secureUrl;
+    } else if (isPdf) {
+      viewerUrl = `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(secureUrl)}`;
     } else {
-      // Injection de retryKey pour forcer Google a eviter le cache au besoin
-      viewerUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(secureUrl)}&retry=${retryKey}`;
+      viewerUrl = secureUrl;
     }
   }
 

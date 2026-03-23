@@ -4,7 +4,7 @@ import socketService from '../../services/socketService';
 export const resourceApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getResources: builder.query({
-      query: ({ page = 1, limit = 10, category, level, search, sort } = {}) => {
+      query: ({ page = 1, limit = 20, category, level, search, sort } = {}) => {
         const params = new URLSearchParams();
         params.append('page', page);
         params.append('limit', limit);
@@ -98,10 +98,36 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
     
     logView: builder.mutation({
       query: (id) => ({ url: `/v1/resources/${id}/view`, method: 'PATCH' }),
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+            const resource = draft.find(r => String(r._id) === String(id));
+            if (resource) resource.views += 1;
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      }
     }),
 
     logDownload: builder.mutation({
       query: (id) => ({ url: `/v1/resources/${id}/download`, method: 'PATCH' }),
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+            const resource = draft.find(r => String(r._id) === String(id));
+            if (resource) resource.downloads += 1;
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      }
     }),
     
     deleteResource: builder.mutation({
