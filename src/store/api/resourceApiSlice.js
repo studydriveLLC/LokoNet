@@ -1,5 +1,4 @@
 import { apiSlice } from '../slices/apiSlice';
-import socketService from '../../services/socketService';
 
 export const resourceApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -24,42 +23,7 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
               ...result.map(({ _id }) => ({ type: 'Resource', id: _id })),
               { type: 'Resource', id: 'LIST' }
             ]
-          : [{ type: 'Resource', id: 'LIST' }],
-          
-      async onCacheEntryAdded(arg, { updateCachedData, cacheDataLoaded, cacheEntryRemoved }) {
-        try {
-          await cacheDataLoaded;
-          const socket = await socketService.connect();
-          
-          const handleNewResource = (newResource) => {
-            updateCachedData((draft) => {
-              const exists = draft.find(r => String(r._id) === String(newResource._id));
-              if (!exists) {
-                draft.unshift(newResource);
-              }
-            });
-          };
-
-          const handleStatsUpdated = (data) => {
-            updateCachedData((draft) => {
-              const resource = draft.find(r => String(r._id) === String(data.id));
-              if (resource) {
-                if (data.views !== undefined) resource.views = data.views;
-                if (data.downloads !== undefined) resource.downloads = data.downloads;
-              }
-            });
-          };
-          
-          socket.on('newResource', handleNewResource);
-          socket.on('resourceStatsUpdated', handleStatsUpdated);
-          
-          await cacheEntryRemoved;
-          socket.off('newResource', handleNewResource);
-          socket.off('resourceStatsUpdated', handleStatsUpdated);
-        } catch (error) {
-          console.log('Erreur synchronisation socket ressources', error);
-        }
-      }
+          : [{ type: 'Resource', id: 'LIST' }]
     }),
     
     getResource: builder.query({

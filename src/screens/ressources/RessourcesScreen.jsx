@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import AnimatedHeader from '../../components/navigation/AnimatedHeader';
 import SkeletonResourceCard from '../../components/ressources/SkeletonResourceCard';
 import ResourceCard from '../../components/ressources/ResourceCard';
@@ -13,7 +13,9 @@ import ResourceOptionsModal from '../../components/ressources/ResourceOptionsMod
 import DocumentViewerModal from '../../components/ressources/DocumentViewerModal';
 import SmartRefreshOverlay from '../../components/ui/SmartRefreshOverlay';
 import { useAppTheme } from '../../theme/theme';
+import socketService from '../../services/socketService';
 import { 
+  resourceApiSlice,
   useGetResourcesQuery, 
   useDeleteResourceMutation, 
   useLogDownloadMutation,
@@ -22,7 +24,6 @@ import {
   useToggleFavoriteMutation,
   useReportResourceMutation
 } from '../../store/api/resourceApiSlice';
-import socketService from '../../services/socketService';
 
 export default function RessourcesScreen({ navigation }) {
   const theme = useAppTheme();
@@ -30,6 +31,7 @@ export default function RessourcesScreen({ navigation }) {
   const scrollY = useSharedValue(0);
   const listRef = useRef(null);
   const isFetchingRef = useRef(false);
+  const dispatch = useDispatch();
 
   const token = useSelector((state) => state.auth?.token);
 
@@ -58,6 +60,52 @@ export default function RessourcesScreen({ navigation }) {
   }, [refetch]);
 
   useEffect(() => {
+    let socketInstance;
+
+    const setupLiveResources = async () => {
+      try {
+        socketInstance = await socketService.connect();
+
+        const handleStats = (data) => {
+          dispatch(
+            resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+              const resource = draft.find(r => String(r._id) === String(data.id));
+              if (resource) {
+                if (data.views !== undefined) resource.views = data.views;
+                if (data.downloads !== undefined) resource.downloads = data.downloads;
+              }
+            })
+          );
+        };
+
+        const handleNew = (newResource) => {
+          dispatch(
+            resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+              const exists = draft.find(r => String(r._id) === String(newResource._id));
+              if (!exists) draft.unshift(newResource);
+            })
+          );
+        };
+
+        socketInstance.on('resourceStatsUpdated', handleStats);
+        socketInstance.on('newResource', handleNew);
+
+      } catch (error) {
+        console.log('Erreur Socket UI:', error);
+      }
+    };
+
+    setupLiveResources();
+
+    return () => {
+      if (socketInstance) {
+        socketInstance.off('resourceStatsUpdated');
+        socketInstance.off('newResource');
+      }
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', async (event) => {
       if (event.routeName !== 'Ressources') return;
       if (isFetchingRef.current) return;
@@ -68,7 +116,6 @@ export default function RessourcesScreen({ navigation }) {
       try {
         await refetch();
         
-        // Le scroll doit se faire apres le refetch et avec une animation
         if (listRef.current) {
           setTimeout(() => {
             if (typeof listRef.current.scrollToOffset === 'function') {
@@ -86,36 +133,6 @@ export default function RessourcesScreen({ navigation }) {
       }
     });
     return () => subscription.remove();
-  }, [refetch]);
-
-  useEffect(() => {
-    let socketInstance;
-
-    const setupLiveResources = async () => {
-      try {
-        socketInstance = await socketService.connect();
-        
-        socketInstance.on('resourceStatsUpdated', () => {
-          refetch();
-        });
-        
-        socketInstance.on('newResource', () => {
-          refetch();
-        });
-
-      } catch (error) {
-        console.log('Erreur de connexion socket dans Ressources', error);
-      }
-    };
-
-    setupLiveResources();
-
-    return () => {
-      if (socketInstance) {
-        socketInstance.off('resourceStatsUpdated');
-        socketInstance.off('newResource');
-      }
-    };
   }, [refetch]);
 
   const scrollHandler = useAnimatedScrollHandler({
