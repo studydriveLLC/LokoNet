@@ -22,6 +22,7 @@ import {
   useToggleFavoriteMutation,
   useReportResourceMutation
 } from '../../store/api/resourceApiSlice';
+import socketService from '../../services/socketService';
 
 export default function RessourcesScreen({ navigation }) {
   const theme = useAppTheme();
@@ -64,12 +65,19 @@ export default function RessourcesScreen({ navigation }) {
       isFetchingRef.current = true;
       setIsSmartRefreshing(true);
       
-      if (listRef.current) {
-        listRef.current.scrollToOffset({ offset: 0, animated: false });
-      }
-      
       try {
         await refetch();
+        
+        // Le scroll doit se faire apres le refetch et avec une animation
+        if (listRef.current) {
+          setTimeout(() => {
+            if (typeof listRef.current.scrollToOffset === 'function') {
+              listRef.current.scrollToOffset({ offset: 0, animated: true });
+            } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
+              listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
+            }
+          }, 100);
+        }
       } catch (error) {
         console.log('Erreur silencieuse refetch', error);
       } finally {
@@ -78,6 +86,36 @@ export default function RessourcesScreen({ navigation }) {
       }
     });
     return () => subscription.remove();
+  }, [refetch]);
+
+  useEffect(() => {
+    let socketInstance;
+
+    const setupLiveResources = async () => {
+      try {
+        socketInstance = await socketService.connect();
+        
+        socketInstance.on('resourceStatsUpdated', () => {
+          refetch();
+        });
+        
+        socketInstance.on('newResource', () => {
+          refetch();
+        });
+
+      } catch (error) {
+        console.log('Erreur de connexion socket dans Ressources', error);
+      }
+    };
+
+    setupLiveResources();
+
+    return () => {
+      if (socketInstance) {
+        socketInstance.off('resourceStatsUpdated');
+        socketInstance.off('newResource');
+      }
+    };
   }, [refetch]);
 
   const scrollHandler = useAnimatedScrollHandler({

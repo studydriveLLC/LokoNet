@@ -3,7 +3,13 @@ import { getToken } from '../store/secureStoreAdapter';
 
 const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || '';
 
-const socketUrl = rawBaseUrl.replace(/\/v1\/?$/, '');
+// Extraction securisee de l'origine (ex: http://192.168.1.10:5000)
+const getBaseOrigin = (url) => {
+  const match = url.match(/^(https?:\/\/[^\/]+)/);
+  return match ? match[1] : url;
+};
+
+const socketUrl = getBaseOrigin(rawBaseUrl);
 let socket = null;
 
 const socketService = {
