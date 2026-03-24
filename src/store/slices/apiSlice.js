@@ -1,3 +1,4 @@
+// src/store/slices/apiSlice.js
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { Mutex } from 'async-mutex';
 import { Platform } from 'react-native';
@@ -139,11 +140,21 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   return result;
 };
 
-export const apiSlice = createApi({
-  reducerPath: 'api',
-  baseQuery: baseQueryWithReauth,
-  // CORRECTION CRITIQUE : Forcer le rafraichissement au montage de l'app apres un reload
-  refetchOnMountOrArgChange: true,
-  tagTypes: ['User', 'Post', 'Workspace', 'Notification', 'Resource'],
-  endpoints: () => ({}),
-});
+const createOrGetApiSlice = () => {
+  if (global.__API_SLICE__) {
+    return global.__API_SLICE__;
+  }
+
+  const newApiSlice = createApi({
+    reducerPath: 'api',
+    baseQuery: baseQueryWithReauth,
+    refetchOnMountOrArgChange: true,
+    tagTypes: ['User', 'Post', 'Workspace', 'Notification', 'Resource'],
+    endpoints: () => ({}),
+  });
+
+  global.__API_SLICE__ = newApiSlice;
+  return newApiSlice;
+};
+
+export const apiSlice = createOrGetApiSlice();
