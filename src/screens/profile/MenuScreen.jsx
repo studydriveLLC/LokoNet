@@ -10,8 +10,9 @@ import LogoutModal from '../../components/profile/LogoutModal';
 import { useAppTheme } from '../../theme/theme';
 
 import { useUpdateProfileMutation, useLogoutMutation } from '../../store/api/authApiSlice';
-import { updateUser, logout } from '../../store/slices/authSlice';
-import { deleteToken, saveToken } from '../../store/secureStoreAdapter'; // Utilisation de TON adapter hybride
+// CORRECTION : On importe uniquement ce dont on a besoin. performLogout remplace logout.
+import { updateUser, performLogout } from '../../store/slices/authSlice';
+import socketService from '../../services/socketService';
 
 export default function MenuScreen({ navigation }) {
   const theme = useAppTheme();
@@ -31,36 +32,30 @@ export default function MenuScreen({ navigation }) {
       const response = await updateProfileApi(updatedData).unwrap();
       const newUserData = response.data?.user || updatedData;
       
-      // Mise à jour de Redux
+      // La mise a jour du Redux declenchera automatiquement la sauvegarde dans SecureStore 
+      // via la logique que nous avons mise en place dans authSlice.js
       dispatch(updateUser(newUserData));
-      
-      // Mise à jour vitale dans le stockage local pour survivre au redémarrage
-      const currentUserData = await getToken('userData');
-      const parsedUser = currentUserData ? JSON.parse(currentUserData) : {};
-      await saveToken('userData', JSON.stringify({ ...parsedUser, ...newUserData }));
       
       setIsEditModalVisible(false);
     } catch (error) {
-      console.error("Erreur lors de la mise à jour du profil :", error);
+      console.error("Erreur lors de la mise a jour du profil :", error);
     }
   };
 
   const handleConfirmLogout = async () => {
     try {
+      // On previent le serveur si possible
       await logoutApi().unwrap();
     } catch (error) {
-      console.error("Erreur serveur lors de la déconnexion, forçage local.", error);
+      console.log("Deconnexion serveur echouee, forcage local.", error);
     } finally {
-      // Nettoyage critique via l'adapter (supporte Mobile ET Web)
-      try {
-        await deleteToken('accessToken');
-        await deleteToken('refreshToken');
-        await deleteToken('userData'); // Suppression de l'identité
-      } catch (storeError) {
-        console.error("Erreur lors du nettoyage du stockage", storeError);
-      }
+      // 1. On coupe le Socket proprement
+      socketService.disconnect();
       
-      dispatch(logout());
+      // 2. LA SUPER DECONNEXION : Purge le Redux, le cache RTK Query et le SecureStore d'un seul coup
+      dispatch(performLogout());
+      
+      setIsLogoutModalVisible(false);
     }
   };
 
@@ -87,7 +82,7 @@ export default function MenuScreen({ navigation }) {
                 {user?.pseudo || 'Utilisateur'}
               </Text>
               <Text style={[styles.email, { color: theme.colors.textMuted }]}>
-                {user?.email || 'Email non renseigné'}
+                {user?.email || 'Email non renseigne'}
               </Text>
             </View>
           </View>
@@ -100,11 +95,11 @@ export default function MenuScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Préférences</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Preferences</Text>
         <View style={[styles.menuBlock, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <MenuItem icon={<Settings color={theme.colors.primaryDark} size={20} />} label="Paramètres du compte" onPress={() => console.log("Paramètres")} />
+          <MenuItem icon={<Settings color={theme.colors.primaryDark} size={20} />} label="Parametres du compte" onPress={() => console.log("Parametres")} />
           <MenuItem icon={<Bell color={theme.colors.primaryDark} size={20} />} label="Notifications" onPress={() => console.log("Notifications")} />
-          <MenuItem icon={<UserCheck color={theme.colors.primaryDark} size={20} />} label="Confidentialité" onPress={() => console.log("Confidentialité")} />
+          <MenuItem icon={<UserCheck color={theme.colors.primaryDark} size={20} />} label="Confidentialite" onPress={() => console.log("Confidentialite")} />
         </View>
 
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Assistance</Text>
@@ -115,7 +110,7 @@ export default function MenuScreen({ navigation }) {
         <View style={styles.logoutContainer}>
           <MenuItem 
             icon={<LogOut color={theme.colors.error} size={20} />} 
-            label="Se déconnecter" 
+            label="Se deconnecter" 
             isDestructive={true} 
             onPress={() => setIsLogoutModalVisible(true)} 
           />

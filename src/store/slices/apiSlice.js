@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { Mutex } from 'async-mutex';
 import { Platform } from 'react-native';
 import { getToken } from '../secureStoreAdapter';
-import { setCredentials, logout, setTokenRefreshing } from '../slices/authSlice';
+import { setCredentials, performLogout, setTokenRefreshing } from '../slices/authSlice';
 
 const mutex = new Mutex();
 const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || '';
@@ -93,7 +93,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
         if (!currentRefreshToken) {
             console.warn("[API] Aucun refresh token disponible. Déconnexion.");
-            api.dispatch(logout());
+            api.dispatch(performLogout());
             return result;
         }
 
@@ -116,14 +116,13 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
             refreshToken: newRefreshToken 
           }));
           
-          // LA CORRECTION VITALE : On ressuscite le Socket immediatement
           const socketService = require('../../services/socketService').default;
           socketService.updateToken(newToken);
 
           result = await baseQuery(args, api, extraOptions);
         } else if (refreshResult.error && refreshResult.error.status !== 'FETCH_ERROR' && refreshResult.error.status !== 'TIMEOUT_ERROR') {
           console.warn("[API] Le serveur a rejete le refresh token. Déconnexion.");
-          api.dispatch(logout());
+          api.dispatch(performLogout());
         }
       } catch (error) {
         console.error('[API] Echec critique lors du rafraichissement', error);
@@ -143,6 +142,8 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
+  // CORRECTION CRITIQUE : Forcer le rafraichissement au montage de l'app apres un reload
+  refetchOnMountOrArgChange: true,
   tagTypes: ['User', 'Post', 'Workspace', 'Notification', 'Resource'],
   endpoints: () => ({}),
 });

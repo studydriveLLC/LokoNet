@@ -6,6 +6,10 @@ const uiSlice = createSlice({
     errorToast: {
       isVisible: false,
       message: '',
+    },
+    successToast: {
+      isVisible: false,
+      message: '',
     }
   },
   reducers: {
@@ -16,9 +20,17 @@ const uiSlice = createSlice({
     hideErrorToast: (state) => {
       state.errorToast.isVisible = false;
       state.errorToast.message = '';
+    },
+    showSuccessToast: (state, action) => {
+      state.successToast.isVisible = true;
+      state.successToast.message = action.payload.message || 'Action reussie.';
+    },
+    hideSuccessToast: (state) => {
+      state.successToast.isVisible = false;
+      state.successToast.message = '';
     }
   }
 });
 
-export const { showErrorToast, hideErrorToast } = uiSlice.actions;
+export const { showErrorToast, hideErrorToast, showSuccessToast, hideSuccessToast } = uiSlice.actions;
 export default uiSlice.reducer;

@@ -13,6 +13,7 @@ import RegisterPage from '../screens/auth/RegisterPage';
 import MainTabNavigator from './MainTabNavigator';
 import MenuScreen from '../screens/profile/MenuScreen';
 import ErrorToast from '../components/ui/ErrorToast';
+import SuccessToast from '../components/ui/SuccessToast';
 import TopInsetBox from '../components/ui/TopInsetBox';
 import TokenGuardian from '../components/auth/TokenGuardian';
 
@@ -51,7 +52,6 @@ export default function AppNavigator() {
       try {
         const token = await getToken('accessToken');
         const userDataStr = await getToken('userData');
-        // Correction Critique : Recuperation du refreshToken pour eviter le crash silencieux
         const refreshToken = await getToken('refreshToken');
 
         if (token && userDataStr) {
@@ -60,7 +60,7 @@ export default function AppNavigator() {
           dispatch(setCredentials({ 
             user: savedUser, 
             token, 
-            refreshToken // Injection dans le store des le demarrage
+            refreshToken
           }));
         } else {
           dispatch(setCredentials({ user: null, token: null, refreshToken: null }));
@@ -126,7 +126,10 @@ export default function AppNavigator() {
             </>
           )}
         </Stack.Navigator>
+        
+        {/* Les notifications globales */}
         <ErrorToast />
+        <SuccessToast />
       </View>
     </GestureHandlerRootView>
   );

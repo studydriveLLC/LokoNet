@@ -19,6 +19,7 @@ import BottomSheet from '../../components/ui/BottomSheet';
 import SmartRefreshOverlay from '../../components/ui/SmartRefreshOverlay';
 import { useAppTheme } from '../../theme/theme';
 import socketService from '../../services/socketService';
+import { showSuccessToast } from '../../store/slices/uiSlice';
 import { 
   resourceApiSlice, useGetResourcesQuery, useDeleteResourceMutation, 
   useLogDownloadMutation, useLogViewMutation, useGetResourceQuery, 
@@ -46,7 +47,6 @@ export default function RessourcesScreen({ navigation }) {
   const [isSmartRefreshing, setIsSmartRefreshing] = useState(false);
   const [activeViewId, setActiveViewId] = useState(null);
 
-  // Nouveaux etats pour les modales d'action
   const [editingResource, setEditingResource] = useState(null);
   const [reportingResource, setReportingResource] = useState(null);
   const [resourceToDelete, setResourceToDelete] = useState(null);
@@ -217,6 +217,7 @@ export default function RessourcesScreen({ navigation }) {
     if (!resourceToDelete) return;
     try {
       await deleteResource(resourceToDelete._id).unwrap();
+      dispatch(showSuccessToast({ message: "Le document a ete supprime avec succes." }));
       setResourceToDelete(null);
     } catch (error) {
       console.log('Erreur de suppression:', error);
@@ -267,7 +268,6 @@ export default function RessourcesScreen({ navigation }) {
         />
       )}
 
-      {/* Les Modales d'Action */}
       <ResourceOptionsModal
         visible={!!activeOptionsResource}
         resource={activeOptionsResource}
@@ -278,10 +278,18 @@ export default function RessourcesScreen({ navigation }) {
           if (url && await Sharing.isAvailableAsync()) await Sharing.shareAsync(url);
           setActiveOptionsResource(null);
         }}
+        
+        // LA LOGIQUE FAVORIS AVEC TOAST VISUEL
         onSave={async () => {
-          try { await toggleFavorite(activeOptionsResource._id).unwrap(); } catch (e) {}
+          try { 
+            const result = await toggleFavorite(activeOptionsResource._id).unwrap();
+            dispatch(showSuccessToast({ message: result.message }));
+          } catch (e) {
+            console.log('Erreur favoris:', e);
+          }
           setActiveOptionsResource(null);
         }}
+
         onEdit={() => {
           setEditingResource(activeOptionsResource);
           setActiveOptionsResource(null);
@@ -315,7 +323,6 @@ export default function RessourcesScreen({ navigation }) {
         token={token}
       />
 
-      {/* Confirmation de Suppression (Design System strict, sans alert natif) */}
       <BottomSheet isVisible={!!resourceToDelete} onClose={() => setResourceToDelete(null)}>
         <View style={styles.deleteConfirmContainer}>
           <View style={styles.deleteIconBox}>
@@ -357,8 +364,6 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, textAlign: 'center', marginBottom: 20 },
   retryButton: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20 },
   retryText: { fontSize: 14, fontWeight: '700' },
-  
-  // Styles pour la modale de suppression interne
   deleteConfirmContainer: { paddingHorizontal: 24, paddingBottom: 30, paddingTop: 10, alignItems: 'center' },
   deleteIconBox: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(235, 87, 87, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   deleteConfirmTitle: { fontSize: 20, fontWeight: '800', marginBottom: 12, textAlign: 'center' },

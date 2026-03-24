@@ -29,7 +29,6 @@ const authSlice = createSlice({
     setCredentials: (state, action) => {
       const { user, token, refreshToken } = action.payload;
       
-      // Correction : Utilisation stricte pour permettre d'ecraser avec null si besoin
       if (user !== undefined) state.user = user;
       if (token !== undefined) state.token = token;
       if (refreshToken !== undefined) state.refreshToken = refreshToken;
@@ -69,6 +68,14 @@ const authSlice = createSlice({
 });
 
 export const { setCredentials, updateUser, logout, setAuthLoading, setTokenRefreshing } = authSlice.actions;
+
+// --- NOUVEAU : La Super Deconnexion qui purge le cache API ---
+export const performLogout = () => async (dispatch) => {
+  dispatch(logout());
+  // Importation dynamique pour eviter les dependances circulaires
+  const { apiSlice } = require('./apiSlice');
+  dispatch(apiSlice.util.resetApiState());
+};
 
 export const forceSilentRefresh = () => async (dispatch, getState) => {
   const { auth } = getState();
@@ -113,7 +120,7 @@ export const forceSilentRefresh = () => async (dispatch, getState) => {
         refreshToken: newRefreshToken
       }));
     } else if (response.status === 401 || response.status === 403) {
-      dispatch(logout());
+      dispatch(performLogout());
     }
   } catch (error) {
     console.error("[AUTH] Echec reseau du rafraichissement silencieux. Session conservee:", error);
