@@ -56,7 +56,8 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   const isSleepingOrOffline = wasSuspended || isBrowserHidden || isBrowserOffline;
 
   let requestUrl = typeof args === 'string' ? args : args?.url || '';
-  const isAuthEndpoint = requestUrl.includes('/login') || requestUrl.includes('/register') || requestUrl.includes('/refresh');
+  // CORRECTION : Ajout de /updateMyPassword pour éviter la boucle infinie sur erreur 401
+  const isAuthEndpoint = requestUrl.includes('/login') || requestUrl.includes('/register') || requestUrl.includes('/refresh') || requestUrl.includes('/updateMyPassword');
 
   let retries = 0;
   const maxRetries = 3;
