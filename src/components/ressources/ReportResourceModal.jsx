@@ -1,9 +1,12 @@
+// src/components/ressources/ReportResourceModal.jsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { AlertTriangle, CheckCircle2, Circle, CheckCircle } from 'lucide-react-native';
+import { useDispatch } from 'react-redux';
 import BottomSheet from '../ui/BottomSheet';
 import { useAppTheme } from '../../theme/theme';
 import { useReportResourceMutation } from '../../store/api/resourceApiSlice';
+import { showSuccessToast } from '../../store/slices/uiSlice';
 
 const REASONS = [
   "Contenu inapproprie ou offensant",
@@ -16,6 +19,7 @@ const REASONS = [
 
 export default function ReportResourceModal({ visible, onClose, resource }) {
   const theme = useAppTheme();
+  const dispatch = useDispatch();
   const [reportResource, { isLoading }] = useReportResourceMutation();
 
   const [selectedReason, setSelectedReason] = useState(null);
@@ -37,6 +41,7 @@ export default function ReportResourceModal({ visible, onClose, resource }) {
     try {
       await reportResource({ id: resource._id, reason: selectedReason }).unwrap();
       setIsSuccess(true);
+      dispatch(showSuccessToast({ message: "Signalement envoye avec succes" }));
       setTimeout(() => {
         onClose();
       }, 2000);

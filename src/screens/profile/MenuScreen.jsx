@@ -1,5 +1,6 @@
+// src/screens/profile/MenuScreen.jsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Settings, Bell, ShieldQuestion, UserCheck, LogOut } from 'lucide-react-native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -73,9 +74,13 @@ export default function MenuScreen({ navigation }) {
         <View style={[styles.profileCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.profileInfoRow}>
             <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primaryLight }]}>
-              <Text style={{ color: theme.colors.primaryDark, fontSize: 24, fontWeight: '700' }}>
-                {user?.pseudo ? user.pseudo[0].toUpperCase() : 'K'}
-              </Text>
+              {user?.avatar ? (
+                <Image source={{ uri: user.avatar }} style={{ width: '100%', height: '100%', borderRadius: 32 }} />
+              ) : (
+                <Text style={{ color: theme.colors.primaryDark, fontSize: 24, fontWeight: '700' }}>
+                  {user?.pseudo ? user.pseudo[0].toUpperCase() : 'K'}
+                </Text>
+              )}
             </View>
             <View style={styles.profileTextContainer}>
               <Text style={[styles.pseudo, { color: theme.colors.text }]}>

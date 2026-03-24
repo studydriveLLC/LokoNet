@@ -1,3 +1,4 @@
+// src/components/ui/SuccessToast.jsx
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
@@ -12,13 +13,17 @@ export default function SuccessToast() {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(-150);
 
+  const closeToast = () => {
+    dispatch(hideSuccessToast());
+  };
+
   useEffect(() => {
     if (isVisible) {
       translateY.value = withSpring(insets.top + 15, { damping: 15, stiffness: 100 });
       
       const timer = setTimeout(() => {
         translateY.value = withTiming(-150, { duration: 300 }, () => {
-          runOnJS(dispatch)(hideSuccessToast());
+          runOnJS(closeToast)();
         });
       }, 3000);
       
