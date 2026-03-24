@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl, Platform, AppState } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -31,7 +31,6 @@ export default function RessourcesScreen({ navigation }) {
   const token = useSelector((state) => state.auth?.token);
   const currentUserId = navigation.getState()?.routes?.find((r) => r.name === 'Main')?.params?.user?._id;
 
-  // Gestion dynamique des parametres de requete pour le temps reel
   const [queryArgs, setQueryArgs] = useState({ page: 1, limit: 20 });
   const queryArgsRef = useRef(queryArgs);
 
@@ -57,9 +56,21 @@ export default function RessourcesScreen({ navigation }) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    await socketService.forceReconnect();
     await refetch();
     setRefreshing(false);
   }, [refetch]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        socketService.forceReconnect();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let socketInstance;
@@ -68,7 +79,6 @@ export default function RessourcesScreen({ navigation }) {
         socketInstance = await socketService.connect();
         
         socketInstance.on('resourceStatsUpdated', (data) => {
-          // 1. Patch optimiste pour reactivite instantanee sur l'ecran actuel
           dispatch(resourceApiSlice.util.updateQueryData('getResources', queryArgsRef.current, (draft) => {
             const resource = draft.find(r => String(r._id) === String(data.id));
             if (resource) {
@@ -76,7 +86,6 @@ export default function RessourcesScreen({ navigation }) {
               if (data.downloads !== undefined) resource.downloads = data.downloads;
             }
           }));
-          // 2. Invalidation silencieuse pour synchroniser Redux globalement
           dispatch(resourceApiSlice.util.invalidateTags([{ type: 'Resource', id: data.id }]));
         });
 
@@ -89,7 +98,6 @@ export default function RessourcesScreen({ navigation }) {
               draft.unshift(newResource);
             }
           }));
-          // Invalidation de la liste pour garantir l'integrite de la pagination serveur
           dispatch(resourceApiSlice.util.invalidateTags([{ type: 'Resource', id: 'LIST' }]));
         });
       } catch (error) {
@@ -114,7 +122,7 @@ export default function RessourcesScreen({ navigation }) {
         if (typeof listRef.current.scrollToOffset === 'function') listRef.current.scrollToOffset({ offset: 0, animated: true });
         else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
       }
-      try { await refetch(); } catch (error) { console.log('Erreur silencieuse refetch', error); } 
+      try { await refetch(); } catch (error) {} 
       finally { setIsSmartRefreshing(false); isFetchingRef.current = false; }
     });
     return () => subscription.remove();
@@ -134,7 +142,8 @@ export default function RessourcesScreen({ navigation }) {
     }
 
     setActiveViewId(resource._id);
-    try { await logView(resource._id).unwrap(); } catch (error) {}
+    
+    logView(resource._id).unwrap().catch(() => {});
 
     const format = resource.format?.toLowerCase();
     const supportedFormats = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
@@ -193,7 +202,9 @@ export default function RessourcesScreen({ navigation }) {
       }
 
       setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
-      await logDownload(resource._id).unwrap();
+      
+      logDownload(resource._id).unwrap().catch(() => {});
+      
       setTimeout(() => setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } })), 3000);
     } catch (error) {
       setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));

@@ -13,19 +13,22 @@ let socket = null;
 
 const socketService = {
   connect: async () => {
-    if (socket) return socket;
+    if (socket && socket.connected) return socket;
+    
+    if (socket) {
+      socket.disconnect();
+    }
     
     const token = await getToken('accessToken');
     
     socket = io(socketUrl, {
       auth: { token },
       transports: ['websocket'],
-      // Reconnexion agressive pour contrer les micro-coupures mobiles
       reconnection: true,
-      reconnectionAttempts: Infinity, // Ne jamais abandonner
-      reconnectionDelay: 1000, // Commencer à 1s
-      reconnectionDelayMax: 5000, // Max 5s entre les tentatives
-      timeout: 20000, // Timeout de connexion
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
       autoConnect: true
     });
     
@@ -34,10 +37,8 @@ const socketService = {
     socket.on('disconnect', (reason) => {
       console.log('[Socket] Deconnecte. Raison:', reason);
       if (reason === 'io server disconnect') {
-        // La déconnexion a été initiée par le serveur, on doit se reconnecter manuellement
         socket.connect();
       }
-      // Les autres raisons (ping timeout, transport close) déclenchent la reconnexion automatique
     });
 
     socket.on('connect_error', (err) => console.log('[Socket] Erreur de connexion:', err.message));
@@ -57,6 +58,20 @@ const socketService = {
     if (socket) {
       socket.auth = { token };
       socket.disconnect().connect();
+    }
+  },
+
+  forceReconnect: async () => {
+    console.log('[Socket] Reconnexion forcee demandee...');
+    if (socket) {
+      socket.disconnect();
+    }
+    const token = await getToken('accessToken');
+    if (socket) {
+      socket.auth = { token };
+      socket.connect();
+    } else {
+      await socketService.connect();
     }
   }
 };

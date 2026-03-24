@@ -148,6 +148,11 @@ export default function DocumentViewerModal({ visible, onClose, resource, token 
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => { setTimeout(() => setIsLoading(false), 1500); }}
             onError={handleAutoRetry}
+            nestedScrollEnabled={true}
+            scrollEnabled={true}
+            bounces={false}
+            showsVerticalScrollIndicator={true}
+            overScrollMode="never"
           />
         )}
         

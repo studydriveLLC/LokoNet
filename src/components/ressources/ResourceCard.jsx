@@ -52,6 +52,7 @@ export default function ResourceCard({
           </Pressable>
         </View>
 
+        {/* Maintien du clic sur le texte pour les utilisateurs habitues (raccourci) */}
         <Pressable 
           onPress={() => onView && onView(resource)}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }, styles.contentRow]}
@@ -82,20 +83,40 @@ export default function ResourceCard({
               )}
             </View>
 
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Eye color={theme.colors.textDisabled} size={14} />
-                <Text style={[styles.statText, { color: theme.colors.textMuted }]}>
-                  {resource.views || 0}
+            {/* Nouvelle zone d'action explicite et statistiques regroupees */}
+            <View style={styles.actionStatsRow}>
+              <Pressable 
+                onPress={() => onView && onView(resource)}
+                style={({ pressed }) => [
+                  styles.viewButton, 
+                  { 
+                    backgroundColor: theme.colors.primaryLight,
+                    opacity: pressed ? 0.7 : 1 
+                  }
+                ]}
+              >
+                <Eye color={theme.colors.primaryDark} size={16} />
+                <Text style={[styles.viewButtonText, { color: theme.colors.primaryDark }]}>
+                  Voir le document
                 </Text>
-              </View>
-              <View style={styles.statItem}>
-                <DownloadIcon color={theme.colors.textDisabled} size={14} />
-                <Text style={[styles.statText, { color: theme.colors.textMuted }]}>
-                  {resource.downloads || 0}
-                </Text>
+              </Pressable>
+
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Eye color={theme.colors.textDisabled} size={14} />
+                  <Text style={[styles.statText, { color: theme.colors.textMuted }]}>
+                    {resource.views || 0}
+                  </Text>
+                </View>
+                <View style={styles.statItem}>
+                  <DownloadIcon color={theme.colors.textDisabled} size={14} />
+                  <Text style={[styles.statText, { color: theme.colors.textMuted }]}>
+                    {resource.downloads || 0}
+                  </Text>
+                </View>
               </View>
             </View>
+
           </View>
 
           <DownloadProgress
@@ -120,11 +141,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '800', marginBottom: 8, lineHeight: 24 },
   description: { fontSize: 14, lineHeight: 22 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  leftFooter: { flex: 1, gap: 12, paddingRight: 10 },
-  badgesRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  leftFooter: { flex: 1, paddingRight: 10 },
+  badgesRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   badgeText: { fontSize: 12, fontWeight: '700', maxWidth: 120 },
-  statsContainer: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionStatsRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16 },
+  viewButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  viewButtonText: { fontSize: 14, fontWeight: '700' },
+  statsContainer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statText: { fontSize: 13, fontWeight: '600' },
 });
