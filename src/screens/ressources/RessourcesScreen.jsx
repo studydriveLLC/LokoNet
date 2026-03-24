@@ -31,6 +31,10 @@ export default function RessourcesScreen({ navigation }) {
   const token = useSelector((state) => state.auth?.token);
   const currentUserId = navigation.getState()?.routes?.find((r) => r.name === 'Main')?.params?.user?._id;
 
+  // Gestion dynamique des parametres de requete pour le temps reel
+  const [queryArgs, setQueryArgs] = useState({ page: 1, limit: 20 });
+  const queryArgsRef = useRef(queryArgs);
+
   const [downloads, setDownloads] = useState({});
   const [activeOptionsResource, setActiveOptionsResource] = useState(null);
   const [activeDocument, setActiveDocument] = useState(null);
@@ -38,7 +42,11 @@ export default function RessourcesScreen({ navigation }) {
   const [isSmartRefreshing, setIsSmartRefreshing] = useState(false);
   const [activeViewId, setActiveViewId] = useState(null);
 
-  const { data: resources = [], isLoading, isError, refetch } = useGetResourcesQuery({ page: 1, limit: 20 });
+  useEffect(() => {
+    queryArgsRef.current = queryArgs;
+  }, [queryArgs]);
+
+  const { data: resources = [], isLoading, isError, refetch } = useGetResourcesQuery(queryArgs);
   useGetResourceQuery(activeViewId, { skip: !activeViewId });
   
   const [logDownload] = useLogDownloadMutation();
@@ -58,21 +66,31 @@ export default function RessourcesScreen({ navigation }) {
     const setupLiveResources = async () => {
       try {
         socketInstance = await socketService.connect();
+        
         socketInstance.on('resourceStatsUpdated', (data) => {
-          dispatch(resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+          // 1. Patch optimiste pour reactivite instantanee sur l'ecran actuel
+          dispatch(resourceApiSlice.util.updateQueryData('getResources', queryArgsRef.current, (draft) => {
             const resource = draft.find(r => String(r._id) === String(data.id));
             if (resource) {
               if (data.views !== undefined) resource.views = data.views;
               if (data.downloads !== undefined) resource.downloads = data.downloads;
             }
           }));
+          // 2. Invalidation silencieuse pour synchroniser Redux globalement
+          dispatch(resourceApiSlice.util.invalidateTags([{ type: 'Resource', id: data.id }]));
         });
+
         socketInstance.on('newResource', (newResource) => {
-          dispatch(resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+          dispatch(resourceApiSlice.util.updateQueryData('getResources', queryArgsRef.current, (draft) => {
             const index = draft.findIndex(r => String(r._id) === String(newResource._id));
-            if (index !== -1) draft[index] = { ...draft[index], ...newResource };
-            else draft.unshift(newResource);
+            if (index !== -1) {
+              draft[index] = { ...draft[index], ...newResource };
+            } else if (queryArgsRef.current.page === 1) {
+              draft.unshift(newResource);
+            }
           }));
+          // Invalidation de la liste pour garantir l'integrite de la pagination serveur
+          dispatch(resourceApiSlice.util.invalidateTags([{ type: 'Resource', id: 'LIST' }]));
         });
       } catch (error) {
         console.log('Erreur Socket UI:', error);
