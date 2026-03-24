@@ -35,11 +35,12 @@ export default function LoginPage({ navigation }) {
     }
 
     try {
-      const response = await login({ identifier, password }).unwrap();
+      // Optimisation : On envoie l'identifiant trimmé pour eviter les bugs d'espaces invisibles
+      const response = await login({ identifier: identifier.trim(), password }).unwrap();
       const { accessToken, user } = response.data;
 
       await saveToken('accessToken', accessToken);
-      await saveToken('userData', JSON.stringify(user)); // Sauvegarde vitale pour le redemarrage
+      await saveToken('userData', JSON.stringify(user)); 
       dispatch(setCredentials({ user, token: accessToken }));
 
     } catch (error) {

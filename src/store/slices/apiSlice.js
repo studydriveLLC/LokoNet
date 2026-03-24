@@ -54,30 +54,29 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
   const isSleepingOrOffline = wasSuspended || isBrowserHidden || isBrowserOffline;
 
+  // Identification de la route pour appliquer le Fail-Fast
+  let requestUrl = typeof args === 'string' ? args : args?.url || '';
+  const isAuthEndpoint = requestUrl.includes('/login') || requestUrl.includes('/register') || requestUrl.includes('/refresh');
+
   // BOUCLE DE REESSAI RESILIENTE (Max 3 tentatives)
   let retries = 0;
   const maxRetries = 3;
 
+  // CORRECTION MAJEURE : On exclut strictement (!isAuthEndpoint) les routes d'auth de la boucle de retry
   while (
     !isSleepingOrOffline && 
+    !isAuthEndpoint && 
     result.error && 
     (result.error.status === 'FETCH_ERROR' || result.error.status === 'TIMEOUT_ERROR') && 
     retries < maxRetries
   ) {
     retries++;
-    // Backoff exponentiel : 1.5s, 3s, 6s... Max 6s
     const delay = Math.min(1500 * Math.pow(2, retries - 1), 6000); 
-    
-    let requestUrl = typeof args === 'string' ? args : args?.url || '';
     console.warn(`[API] Micro-coupure réseau détectée sur ${requestUrl}. Tentative ${retries}/${maxRetries} dans ${delay}ms...`);
     
     await sleep(delay);
     result = await baseQuery(args, api, extraOptions);
   }
-
-  let requestUrl = typeof args === 'string' ? args : args?.url || '';
-  // On ne tente JAMAIS de rafraîchir si l'erreur vient d'un endpoint d'auth
-  const isAuthEndpoint = requestUrl.includes('/login') || requestUrl.includes('/register') || requestUrl.includes('/refresh');
 
   // LOGIQUE DE REFRESH TOKEN
   if (result.error && result.error.status === 401 && !isAuthEndpoint) {
@@ -91,20 +90,17 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
         api.dispatch(setTokenRefreshing(true));
 
-        // 1. On récupère le refresh token de manière robuste ("Bank Grade")
         let currentRefreshToken = api.getState().auth?.refreshToken;
         if (!currentRefreshToken) {
            currentRefreshToken = await getToken('refreshToken');
         }
 
-        // Si vraiment aucun refresh token, on doit déconnecter
         if (!currentRefreshToken) {
             console.warn("[API] Aucun refresh token disponible. Déconnexion.");
             api.dispatch(logout());
             return result;
         }
 
-        // 2. On l'envoie dans le body (standard pour les apps mobiles)
         const refreshResult = await baseQuery(
           { 
             url: '/v1/auth/refresh', 
@@ -117,7 +113,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
         if (refreshResult.data?.status === 'success') {
           const newToken = refreshResult.data.data.accessToken;
-          // 3. CRUCIAL : On conserve l'ancien si le serveur n'en renvoie pas de nouveau
           const newRefreshToken = refreshResult.data.data.refreshToken || currentRefreshToken;
           const user = api.getState().auth?.user;
 
@@ -126,8 +121,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
             token: newToken, 
             refreshToken: newRefreshToken 
           }));
-          
-          // La sauvegarde persistante est gérée par setCredentials dans authSlice
           
           result = await baseQuery(args, api, extraOptions);
         } else {
