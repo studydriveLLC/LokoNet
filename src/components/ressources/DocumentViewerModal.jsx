@@ -1,151 +1,167 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Image, Text, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import BottomSheet from '../ui/BottomSheet';
+import AnimatedButton from '../ui/AnimatedButton';
 import { useAppTheme } from '../../theme/theme';
 
-export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
+export default function DocumentViewerModal({ visible, onClose, resource, token }) {
   const theme = useAppTheme();
-  // On utilise un timestamp pour le retryKey. Il servira aussi de Cache-Buster.
+  const webViewRef = useRef(null);
   const [retryKey, setRetryKey] = useState(Date.now());
+  const [retryCount, setRetryCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasViewerError, setHasViewerError] = useState(false);
   
+  const MAX_RETRIES = 3;
+
   useEffect(() => {
     if (visible) {
-      setRetryKey(Date.now());
-      setIsLoading(true);
-      
-      // On passe le timeout à 8 secondes, car l'API de Microsoft ou Google 
-      // peut prendre un peu de temps pour générer le premier aperçu.
-      const timer = setTimeout(() => {
-        setIsLoading(false);
-      }, 8000);
-      
-      return () => clearTimeout(timer);
+      resetState();
     }
-  }, [visible, resourceUrl]);
+  }, [visible, resource]);
 
-  if (!resourceUrl) return null;
+  const resetState = () => {
+    setRetryKey(Date.now());
+    setRetryCount(0);
+    setIsLoading(true);
+    setHasViewerError(false);
+  };
 
-  const isLocalUrl = resourceUrl.includes('192.168.') || resourceUrl.includes('localhost');
-  const finalUrl = isLocalUrl ? resourceUrl : resourceUrl.replace('http://', 'https://');
-  const urlWithoutParams = finalUrl.split('?')[0];
+  if (!resource || !resource.resolvedUrl) return null;
 
-  const isImage = urlWithoutParams.match(/\.(jpeg|jpg|png|gif)$/i) || finalUrl.includes('image') || finalUrl.includes('res.cloudinary.com/image');
+  const resourceUrl = resource.resolvedUrl;
+  const format = resource.format?.toLowerCase() || '';
+
+  const isLocalAddress = resourceUrl.match(/192\.168|localhost|10\.0\.2\.2/);
+  const finalUrl = isLocalAddress ? resourceUrl : resourceUrl.replace('http://', 'https://');
+  const isImage = ['png', 'jpg', 'jpeg', 'gif'].includes(format);
   
-  let viewerUrl = finalUrl;
-  let isLocalDoc = false;
+  const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+  const isOurBackend = finalUrl.includes('192.168') || finalUrl.includes('localhost') || (rawBaseUrl && finalUrl.includes(rawBaseUrl.replace('http://', '')));
+  const isCloudinary = finalUrl.includes('cloudinary.com');
+  const isPrivate = isOurBackend && !isCloudinary;
 
-  // STRATÉGIE 1 : Le Cache Buster
-  // On ajoute un paramètre unique à l'URL cible pour forcer Google et iOS à ignorer leur cache 401 précédent
+  let viewerUrl = finalUrl;
+  let requiresDownload = false;
+  let headers = {};
+
   const targetUrl = finalUrl + (finalUrl.includes('?') ? '&cb=' : '?cb=') + retryKey;
   const encodedUrl = encodeURIComponent(targetUrl);
 
   if (!isImage) {
-    if (isLocalUrl) {
-      isLocalDoc = true;
+    if (isPrivate && Platform.OS === 'android') {
+      requiresDownload = true;
     } else if (Platform.OS === 'android') {
-      
-      // STRATÉGIE 2 : Le Routeur de Format
-      const isOfficeDoc = urlWithoutParams.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i);
-      
-      if (isOfficeDoc) {
-        // Microsoft Office Viewer : Extrêmement stable pour les formats Office
-        viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
-      } else {
-        // Google Docs Viewer : Excellent pour les PDF
-        viewerUrl = `https://docs.google.com/gview?embedded=true&url=${encodedUrl}`;
-      }
+      const isOfficeDoc = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(format);
+      viewerUrl = isOfficeDoc 
+        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`
+        : `https://docs.google.com/viewer?embedded=true&url=${encodedUrl}`;
     } else {
-      // Sur iOS, le moteur WebKit lit parfaitement les PDF et DOCX nativement.
-      // Mais on utilise "targetUrl" pour bénéficier du Cache-Buster et éviter l'écran blanc.
       viewerUrl = targetUrl;
+      if (isPrivate && token) headers = { Authorization: `Bearer ${token}` };
     }
+  } else if (isPrivate && token) {
+    headers = { Authorization: `Bearer ${token}` };
   }
 
-  const handleWebViewError = () => {
-    setTimeout(() => {
+  const handleAutoRetry = () => {
+    if (retryCount < MAX_RETRIES) {
+      setIsLoading(true);
+      setRetryCount(prev => prev + 1);
       setRetryKey(Date.now());
-    }, 1500);
+    } else {
+      setHasViewerError(true);
+      setIsLoading(false);
+    }
   };
 
-  // STRATÉGIE 3 : Détection d'erreur renforcée
+  const handleManualRetry = () => {
+    resetState();
+  };
+
   const injectedJavaScript = `
-    setTimeout(function() {
-      try {
-        var body = document.body;
-        if (!body) return;
-        
-        // 1. Détection de page 100% blanche
-        var isEmpty = body.innerText.trim().length === 0 && body.children.length === 0;
-        
-        // 2. Détection des classes CSS d'erreur typiques de Google Docs Viewer
-        var isGoogleError = document.querySelector('.ndfHFb-c4YZDc-Wrql6b') || document.querySelector('.ndfHFb-c4YZDc-GSQQnc-LgbsSe');
-        
-        if (isEmpty || isGoogleError) {
-          window.ReactNativeWebView.postMessage('BLANK_PAGE');
-        }
-      } catch(e) {}
-    }, 3500);
+    (function() {
+      var checkError = function() {
+        var text = document.body.innerText || "";
+        var errorPatterns = ["No preview available", "Apercu indisponible", "Too many requests", "Refused to connect"];
+        var found = errorPatterns.some(function(p) { return text.indexOf(p) !== -1; });
+        var isEmpty = document.body.children.length === 0 && text.trim().length === 0;
+        if (found || isEmpty) { window.ReactNativeWebView.postMessage('VIEWER_ERROR'); }
+      };
+      setTimeout(checkError, 4000);
+    })();
     true;
   `;
 
   const onMessage = (event) => {
-    if (event.nativeEvent.data === 'BLANK_PAGE') {
-      setIsLoading(true);
-      setRetryKey(Date.now()); // Déclenche un nouveau rendu ET génère un nouveau Cache-Buster
-    }
+    if (event.nativeEvent.data === 'VIEWER_ERROR') handleAutoRetry();
   };
+
+  const webViewSource = { uri: viewerUrl };
+  if (Object.keys(headers).length > 0) webViewSource.headers = headers;
 
   return (
     <BottomSheet isVisible={visible} onClose={onClose}>
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {isImage ? (
           <Image 
-            source={{ uri: viewerUrl }} 
+            source={{ uri: viewerUrl, headers: Object.keys(headers).length > 0 ? headers : undefined }} 
             style={styles.imageViewer} 
             resizeMode="contain"
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => setIsLoading(false)}
           />
-        ) : isLocalDoc ? (
-          <View style={[styles.localDocContainer, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.localDocText, { color: theme.colors.text }]}>
-              Apercu indisponible pour les documents en developpement local.
+        ) : (requiresDownload || hasViewerError) ? (
+          <View style={[styles.fallbackContainer, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.fallbackText, { color: theme.colors.text }]}>
+              {hasViewerError 
+                ? "L'affichage a echoue apres plusieurs tentatives." 
+                : "Ce document prive doit etre telecharge pour etre lu sur Android."}
             </Text>
-            <Text style={[styles.localDocSubtext, { color: theme.colors.textMuted }]}>
-              Veuillez utiliser le bouton de telechargement.
+            <Text style={[styles.fallbackSubtext, { color: theme.colors.textMuted }]}>
+              {hasViewerError 
+                ? "Vous pouvez essayer de relancer l'apercu ou utiliser le telechargement."
+                : "Utilisez le bouton de telechargement sur la carte de la ressource."}
             </Text>
+            
+            {hasViewerError && (
+              <AnimatedButton 
+                title="Ressayer" 
+                onPress={handleManualRetry}
+                style={styles.retryButton}
+              />
+            )}
           </View>
         ) : (
           <WebView
+            ref={webViewRef}
             key={retryKey}
-            source={{ uri: viewerUrl }}
+            source={webViewSource}
             style={[styles.webview, { backgroundColor: theme.colors.surface }]}
-            startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             mixedContentMode="always"
-            thirdPartyCookiesEnabled={true}
-            sharedCookiesEnabled={true}
             originWhitelist={['*']}
-            scalesPageToFit={true}
             injectedJavaScript={injectedJavaScript}
             onMessage={onMessage}
             onLoadStart={() => setIsLoading(true)}
-            onLoadEnd={() => setIsLoading(false)}
-            renderLoading={() => null} 
-            onError={handleWebViewError}
-            onHttpError={handleWebViewError}
+            onLoadEnd={() => { setTimeout(() => setIsLoading(false), 1500); }}
+            onError={handleAutoRetry}
           />
         )}
         
-        {isLoading && !isLocalDoc && (
+        {isLoading && !requiresDownload && !hasViewerError && (
           <View style={[styles.loader, { backgroundColor: theme.colors.surface }]}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
-              Ouverture du document...
+              Chargement du document...
             </Text>
+            {retryCount > 0 && (
+              <Text style={{ color: theme.colors.textMuted, fontSize: 12, marginTop: 8 }}>
+                Tentative {retryCount}/{MAX_RETRIES}
+              </Text>
+            )}
           </View>
         )}
       </View>
@@ -154,49 +170,13 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    height: 500, 
-    width: '100%', 
-    overflow: 'hidden', 
-    borderTopLeftRadius: 20, 
-    borderTopRightRadius: 20 
-  },
-  webview: { 
-    flex: 1
-  },
-  imageViewer: {
-    flex: 1,
-    width: '100%',
-    height: '100%'
-  },
-  loader: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0, 
-    justifyContent: 'center', 
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '700'
-  },
-  localDocContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20
-  },
-  localDocText: {
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 10
-  },
-  localDocSubtext: {
-    fontSize: 14,
-    textAlign: 'center'
-  }
+  container: { height: 550, width: '100%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  webview: { flex: 1 },
+  imageViewer: { flex: 1, width: '100%', height: '100%' },
+  loader: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  loadingText: { marginTop: 12, fontSize: 14, fontWeight: '700' },
+  fallbackContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
+  fallbackText: { fontSize: 16, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
+  fallbackSubtext: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  retryButton: { width: '80%', height: 50 }
 });

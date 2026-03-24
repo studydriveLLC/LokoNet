@@ -15,14 +15,9 @@ import SmartRefreshOverlay from '../../components/ui/SmartRefreshOverlay';
 import { useAppTheme } from '../../theme/theme';
 import socketService from '../../services/socketService';
 import { 
-  resourceApiSlice,
-  useGetResourcesQuery, 
-  useDeleteResourceMutation, 
-  useLogDownloadMutation,
-  useLogViewMutation,
-  useGetResourceQuery,
-  useToggleFavoriteMutation,
-  useReportResourceMutation
+  resourceApiSlice, useGetResourcesQuery, useDeleteResourceMutation, 
+  useLogDownloadMutation, useLogViewMutation, useGetResourceQuery, 
+  useToggleFavoriteMutation, useReportResourceMutation 
 } from '../../store/api/resourceApiSlice';
 
 export default function RessourcesScreen({ navigation }) {
@@ -34,10 +29,11 @@ export default function RessourcesScreen({ navigation }) {
   const dispatch = useDispatch();
 
   const token = useSelector((state) => state.auth?.token);
+  const currentUserId = navigation.getState()?.routes?.find((r) => r.name === 'Main')?.params?.user?._id;
 
   const [downloads, setDownloads] = useState({});
   const [activeOptionsResource, setActiveOptionsResource] = useState(null);
-  const [activeDocumentUrl, setActiveDocumentUrl] = useState(null);
+  const [activeDocument, setActiveDocument] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isSmartRefreshing, setIsSmartRefreshing] = useState(false);
   const [activeViewId, setActiveViewId] = useState(null);
@@ -51,8 +47,6 @@ export default function RessourcesScreen({ navigation }) {
   const [toggleFavorite] = useToggleFavoriteMutation();
   const [reportResource] = useReportResourceMutation();
 
-  const currentUserId = navigation.getState()?.routes?.find((r) => r.name === 'Main')?.params?.user?._id;
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
@@ -61,49 +55,30 @@ export default function RessourcesScreen({ navigation }) {
 
   useEffect(() => {
     let socketInstance;
-
     const setupLiveResources = async () => {
       try {
         socketInstance = await socketService.connect();
-
-        const handleStats = (data) => {
-          dispatch(
-            resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
-              const resource = draft.find(r => String(r._id) === String(data.id));
-              if (resource) {
-                if (data.views !== undefined) resource.views = data.views;
-                if (data.downloads !== undefined) resource.downloads = data.downloads;
-              }
-            })
-          );
-        };
-
-        const handleNew = (newResource) => {
-          dispatch(
-            resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
-              const index = draft.findIndex(r => String(r._id) === String(newResource._id));
-              if (index !== -1) {
-                // Si la ressource existe (ex: emise par le controller en statut 'processing')
-                // On met a jour ses donnees avec la version 'ready' du Worker (qui contient l'URL Cloudinary)
-                draft[index] = { ...draft[index], ...newResource };
-              } else {
-                // Sinon on l'ajoute en haut de la liste
-                draft.unshift(newResource);
-              }
-            })
-          );
-        };
-
-        socketInstance.on('resourceStatsUpdated', handleStats);
-        socketInstance.on('newResource', handleNew);
-
+        socketInstance.on('resourceStatsUpdated', (data) => {
+          dispatch(resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+            const resource = draft.find(r => String(r._id) === String(data.id));
+            if (resource) {
+              if (data.views !== undefined) resource.views = data.views;
+              if (data.downloads !== undefined) resource.downloads = data.downloads;
+            }
+          }));
+        });
+        socketInstance.on('newResource', (newResource) => {
+          dispatch(resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+            const index = draft.findIndex(r => String(r._id) === String(newResource._id));
+            if (index !== -1) draft[index] = { ...draft[index], ...newResource };
+            else draft.unshift(newResource);
+          }));
+        });
       } catch (error) {
         console.log('Erreur Socket UI:', error);
       }
     };
-
     setupLiveResources();
-
     return () => {
       if (socketInstance) {
         socketInstance.off('resourceStatsUpdated');
@@ -114,28 +89,15 @@ export default function RessourcesScreen({ navigation }) {
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', async (event) => {
-      if (event.routeName !== 'Ressources') return;
-      if (isFetchingRef.current) return;
-      
+      if (event.routeName !== 'Ressources' || isFetchingRef.current) return;
       isFetchingRef.current = true;
       setIsSmartRefreshing(true);
-
       if (listRef.current) {
-        if (typeof listRef.current.scrollToOffset === 'function') {
-          listRef.current.scrollToOffset({ offset: 0, animated: true });
-        } else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') {
-          listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
-        }
+        if (typeof listRef.current.scrollToOffset === 'function') listRef.current.scrollToOffset({ offset: 0, animated: true });
+        else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
       }
-      
-      try {
-        await refetch();
-      } catch (error) {
-        console.log('Erreur silencieuse refetch', error);
-      } finally {
-        setIsSmartRefreshing(false);
-        isFetchingRef.current = false;
-      }
+      try { await refetch(); } catch (error) { console.log('Erreur silencieuse refetch', error); } 
+      finally { setIsSmartRefreshing(false); isFetchingRef.current = false; }
     });
     return () => subscription.remove();
   }, [refetch]);
@@ -154,17 +116,13 @@ export default function RessourcesScreen({ navigation }) {
     }
 
     setActiveViewId(resource._id);
-    try {
-      await logView(resource._id).unwrap();
-    } catch (error) {
-      console.log('Erreur log vue', error);
-    }
+    try { await logView(resource._id).unwrap(); } catch (error) {}
 
     const format = resource.format?.toLowerCase();
     const supportedFormats = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
 
     if (supportedFormats.includes(format)) {
-      setActiveDocumentUrl(fileUrl);
+      setActiveDocument({ ...resource, resolvedUrl: fileUrl });
     } else {
       try {
         await WebBrowser.openBrowserAsync(fileUrl, {
@@ -179,112 +137,49 @@ export default function RessourcesScreen({ navigation }) {
 
   const handleDownloadAction = async (resource) => {
     let fileUrl = resource.fileUrl || resource.url || resource.tempFilePath;
-    if (!fileUrl) return;
+    if (!fileUrl || downloads[resource._id]?.status === 'downloading') return;
     
-    if (downloads[resource._id]?.status === 'downloading') return;
-
     const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000';
-    const isLocalPath = !fileUrl.startsWith('http');
+    if (!fileUrl.startsWith('http')) fileUrl = `${rawBaseUrl.replace(/\/$/, '')}/${fileUrl.replace(/^\//, '')}`;
     
-    if (isLocalPath) {
-      fileUrl = `${rawBaseUrl.replace(/\/$/, '')}/${fileUrl.replace(/^\//, '')}`;
-    }
-
     setDownloads(prev => ({ ...prev, [resource._id]: { status: 'downloading', progress: 0 } }));
 
     try {
-      const safeTitle = (resource.title || 'Document_LokoNet').replace(/[^a-zA-Z0-9]/g, '_');
-      const ext = resource.format || 'pdf';
-      const fileName = `${safeTitle}.${ext}`;
+      const fileName = `${(resource.title || 'Doc').replace(/[^a-zA-Z0-9]/g, '_')}.${resource.format || 'pdf'}`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-
-      const options = {};
       const isOurBackend = fileUrl.includes(rawBaseUrl) || fileUrl.includes('192.168.') || fileUrl.includes('localhost');
-      const isCloudinary = fileUrl.includes('cloudinary.com');
-      
-      if (isOurBackend && !isCloudinary && token) {
-        options.headers = { Authorization: `Bearer ${token}` };
-      }
+      const options = (isOurBackend && !fileUrl.includes('cloudinary.com') && token) ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+      const onProgress = (e) => setDownloads(prev => ({ ...prev, [resource._id]: { status: 'downloading', progress: (e.totalBytesWritten / e.totalBytesExpectedToWrite) * 100 || 50 } }));
+      const downloadResumable = FileSystem.createDownloadResumable(fileUrl, fileUri, options, onProgress);
 
       if (Platform.OS === 'android') {
         const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (!permissions.granted) {
-          setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
-          return;
-        }
-
-        const downloadResumable = FileSystem.createDownloadResumable(
-          fileUrl, fileUri, options,
-          (progressEvent) => {
-            const progress = (progressEvent.totalBytesWritten / progressEvent.totalBytesExpectedToWrite) * 100;
-            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'downloading', progress: isNaN(progress) ? 50 : progress } }));
-          }
-        );
-
+        if (!permissions.granted) return setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
         const result = await downloadResumable.downloadAsync();
-
         if (result && result.status < 400) {
           try {
             const base64Data = await FileSystem.readAsStringAsync(result.uri, { encoding: FileSystem.EncodingType.Base64 });
             const savedUri = await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/octet-stream');
             await FileSystem.writeAsStringAsync(savedUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
             await FileSystem.deleteAsync(result.uri, { idempotent: true });
-            
-            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
-            await logDownload(resource._id).unwrap();
           } catch (safError) {
-            console.log('Erreur SAF Android, basculement sur le partage natif:', safError);
-            if (await Sharing.isAvailableAsync()) {
-              await Sharing.shareAsync(result.uri, { dialogTitle: 'Enregistrer le document', UTI: 'public.item' });
-            }
-            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
-            await logDownload(resource._id).unwrap();
+            if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(result.uri, { dialogTitle: 'Enregistrer le document' });
           }
-        } else {
-          throw new Error(`Erreur serveur HTTP ${result?.status}`);
-        }
+        } else throw new Error('Erreur HTTP');
       } else {
-        const downloadResumable = FileSystem.createDownloadResumable(
-          fileUrl, fileUri, options,
-          (progressEvent) => {
-            const progress = (progressEvent.totalBytesWritten / progressEvent.totalBytesExpectedToWrite) * 100;
-            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'downloading', progress: isNaN(progress) ? 50 : progress } }));
-          }
-        );
-
         const result = await downloadResumable.downloadAsync();
-
         if (result && result.status < 400) {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(result.uri, { dialogTitle: 'Enregistrer le document', UTI: 'public.item' });
-          }
-          setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
-          await logDownload(resource._id).unwrap();
-        } else {
-          throw new Error(`Erreur serveur HTTP ${result?.status}`);
-        }
+          if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(result.uri, { dialogTitle: 'Enregistrer le document' });
+        } else throw new Error('Erreur HTTP');
       }
 
-      setTimeout(() => {
-        setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
-      }, 3000);
-
+      setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
+      await logDownload(resource._id).unwrap();
+      setTimeout(() => setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } })), 3000);
     } catch (error) {
-      console.log('Erreur telechargement native:', error);
       setDownloads(prev => ({ ...prev, [resource._id]: { status: 'idle', progress: 0 } }));
     }
-  };
-
-  const renderItem = ({ item }) => {
-    return (
-      <ResourceCard
-        resource={item}
-        downloadState={downloads[item._id]}
-        onView={handleViewAction}
-        onDownloadAction={handleDownloadAction}
-        onOptions={setActiveOptionsResource}
-      />
-    );
   };
 
   return (
@@ -308,7 +203,15 @@ export default function RessourcesScreen({ navigation }) {
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: 140 + insets.top, paddingBottom: 100 }}
-          renderItem={renderItem}
+          renderItem={({ item }) => (
+            <ResourceCard
+              resource={item}
+              downloadState={downloads[item._id]}
+              onView={handleViewAction}
+              onDownloadAction={handleDownloadAction}
+              onOptions={setActiveOptionsResource}
+            />
+          )}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
@@ -337,9 +240,7 @@ export default function RessourcesScreen({ navigation }) {
           try { await toggleFavorite(activeOptionsResource._id).unwrap(); } catch (e) {}
           setActiveOptionsResource(null);
         }}
-        onEdit={() => {
-          setActiveOptionsResource(null);
-        }}
+        onEdit={() => setActiveOptionsResource(null)}
         onDelete={async () => {
           try { await deleteResource(activeOptionsResource._id).unwrap(); } catch (e) {}
           setActiveOptionsResource(null);
@@ -351,9 +252,10 @@ export default function RessourcesScreen({ navigation }) {
       />
 
       <DocumentViewerModal
-        visible={!!activeDocumentUrl}
-        onClose={() => setActiveDocumentUrl(null)}
-        resourceUrl={activeDocumentUrl}
+        visible={!!activeDocument}
+        onClose={() => setActiveDocument(null)}
+        resource={activeDocument}
+        token={token}
       />
     </View> 
   );
