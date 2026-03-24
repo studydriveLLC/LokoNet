@@ -81,8 +81,15 @@ export default function RessourcesScreen({ navigation }) {
         const handleNew = (newResource) => {
           dispatch(
             resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
-              const exists = draft.find(r => String(r._id) === String(newResource._id));
-              if (!exists) draft.unshift(newResource);
+              const index = draft.findIndex(r => String(r._id) === String(newResource._id));
+              if (index !== -1) {
+                // Si la ressource existe (ex: emise par le controller en statut 'processing')
+                // On met a jour ses donnees avec la version 'ready' du Worker (qui contient l'URL Cloudinary)
+                draft[index] = { ...draft[index], ...newResource };
+              } else {
+                // Sinon on l'ajoute en haut de la liste
+                draft.unshift(newResource);
+              }
             })
           );
         };
@@ -193,8 +200,9 @@ export default function RessourcesScreen({ navigation }) {
 
       const options = {};
       const isOurBackend = fileUrl.includes(rawBaseUrl) || fileUrl.includes('192.168.') || fileUrl.includes('localhost');
+      const isCloudinary = fileUrl.includes('cloudinary.com');
       
-      if (isOurBackend) {
+      if (isOurBackend && !isCloudinary && token) {
         options.headers = { Authorization: `Bearer ${token}` };
       }
 
@@ -216,13 +224,22 @@ export default function RessourcesScreen({ navigation }) {
         const result = await downloadResumable.downloadAsync();
 
         if (result && result.status < 400) {
-          const base64Data = await FileSystem.readAsStringAsync(result.uri, { encoding: FileSystem.EncodingType.Base64 });
-          const savedUri = await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/octet-stream');
-          await FileSystem.writeAsStringAsync(savedUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-          await FileSystem.deleteAsync(result.uri, { idempotent: true });
-
-          setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
-          await logDownload(resource._id).unwrap();
+          try {
+            const base64Data = await FileSystem.readAsStringAsync(result.uri, { encoding: FileSystem.EncodingType.Base64 });
+            const savedUri = await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/octet-stream');
+            await FileSystem.writeAsStringAsync(savedUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+            await FileSystem.deleteAsync(result.uri, { idempotent: true });
+            
+            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
+            await logDownload(resource._id).unwrap();
+          } catch (safError) {
+            console.log('Erreur SAF Android, basculement sur le partage natif:', safError);
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(result.uri, { dialogTitle: 'Enregistrer le document', UTI: 'public.item' });
+            }
+            setDownloads(prev => ({ ...prev, [resource._id]: { status: 'success', progress: 100 } }));
+            await logDownload(resource._id).unwrap();
+          }
         } else {
           throw new Error(`Erreur serveur HTTP ${result?.status}`);
         }

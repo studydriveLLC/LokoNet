@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Image, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Image, Text, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import BottomSheet from '../ui/BottomSheet';
 import { useAppTheme } from '../../theme/theme';
@@ -11,10 +11,16 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
   
   useEffect(() => {
     if (visible) {
-      setRetryKey(1);
+      setRetryKey(Date.now());
       setIsLoading(true);
+      
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
     }
-  }, [visible]);
+  }, [visible, resourceUrl]);
 
   if (!resourceUrl) return null;
 
@@ -30,15 +36,31 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
   if (!isImage) {
     if (isLocalUrl) {
       isLocalDoc = true;
-    } else {
-      viewerUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(finalUrl)}`;
+    } else if (Platform.OS === 'android') {
+      viewerUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(finalUrl)}&retry=${retryKey}`;
     }
   }
 
   const handleWebViewError = () => {
     setTimeout(() => {
-      setRetryKey(prev => prev + 1);
-    }, 1000);
+      setRetryKey(Date.now());
+    }, 1500);
+  };
+
+  const injectedJavaScript = `
+    setTimeout(function() {
+      if (document.body && document.body.innerText.trim().length === 0 && document.body.children.length === 0) {
+        window.ReactNativeWebView.postMessage('BLANK_PAGE');
+      }
+    }, 2500);
+    true;
+  `;
+
+  const onMessage = (event) => {
+    if (event.nativeEvent.data === 'BLANK_PAGE') {
+      setIsLoading(true);
+      setRetryKey(Date.now());
+    }
   };
 
   return (
@@ -73,6 +95,9 @@ export default function DocumentViewerModal({ visible, onClose, resourceUrl }) {
             thirdPartyCookiesEnabled={true}
             sharedCookiesEnabled={true}
             originWhitelist={['*']}
+            scalesPageToFit={true}
+            injectedJavaScript={injectedJavaScript}
+            onMessage={onMessage}
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => setIsLoading(false)}
             renderLoading={() => null} 
