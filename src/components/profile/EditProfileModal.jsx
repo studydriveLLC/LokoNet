@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Image } from 'react-native';
-import { Camera, Lock, User, Phone } from 'lucide-react-native';
+// Ajout des icônes Eye et EyeOff
+import { Camera, Lock, User, Phone, Eye, EyeOff } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch } from 'react-redux';
 import BottomSheet from '../ui/BottomSheet';
@@ -15,14 +16,21 @@ export default function EditProfileModal({ visible, onClose, currentUser, onSave
 
   const [activeTab, setActiveTab] = useState('profile');
 
+  // État du profil
   const [pseudo, setPseudo] = useState('');
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUri, setAvatarUri] = useState(null);
 
+  // État des mots de passe
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // NOUVEAU : États pour la visibilité des mots de passe
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [updatePassword, { isLoading: isUpdatingPassword }] = useUpdatePasswordMutation();
   const [uploadAvatar, { isLoading: isUploadingAvatar }] = useUploadAvatarMutation();
@@ -35,9 +43,15 @@ export default function EditProfileModal({ visible, onClose, currentUser, onSave
       setPhone(currentUser.phone || '');
       setBio(currentUser.bio || '');
       setAvatarUri(currentUser.avatar || null);
+      
+      // Réinitialisation des champs et des yeux
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+      
       setErrorMsg('');
       setActiveTab('profile');
     }
@@ -92,12 +106,17 @@ export default function EditProfileModal({ visible, onClose, currentUser, onSave
     if (newPassword.length < 6) return setErrorMsg("Le nouveau mot de passe est trop court.");
 
     try {
-      // CORRECTION ICI : Le backend attend l'étiquette exacte "currentPassword"
       await updatePassword({ currentPassword: currentPassword, password: newPassword }).unwrap();
       dispatch(showSuccessToast({ message: "Mot de passe mis a jour avec succes" }));
+      
+      // Réinitialisation après succès
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+      
       onClose();
     } catch (err) {
       setErrorMsg(err?.data?.message || "Erreur lors de la modification du mot de passe.");
@@ -107,6 +126,30 @@ export default function EditProfileModal({ visible, onClose, currentUser, onSave
   const isProfileLoading = isUpdatingProfile || isUploadingAvatar;
   const isProfileValid = pseudo.trim().length >= 2;
   const isPasswordValid = currentPassword.length >= 6 && newPassword.length >= 6 && newPassword === confirmPassword;
+
+  // NOUVEAU : Sous-composant réutilisable pour les champs de mot de passe avec œil
+  const PasswordInput = ({ label, value, onChange, placeholder, isVisible, onToggleVisibility, LeftIcon }) => (
+    <View style={styles.inputGroup}>
+      <Text style={[styles.inputLabel, { color: theme.colors.text }]}>{label}</Text>
+      <View style={[styles.iconInputWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        {LeftIcon && <LeftIcon color={theme.colors.textMuted} size={18} style={styles.inputIcon} />}
+        <TextInput
+          style={[styles.iconTextInput, { color: theme.colors.text }]}
+          placeholder={placeholder}
+          placeholderTextColor={theme.colors.textDisabled}
+          secureTextEntry={!isVisible} // Gère la visibilité
+          value={value}
+          onChangeText={onChange}
+        />
+        <Pressable onPress={onToggleVisibility} style={styles.rightIconPressable}>
+          {isVisible ? 
+            <Eye color={theme.colors.textMuted} size={20} /> : 
+            <EyeOff color={theme.colors.textMuted} size={20} />
+          }
+        </Pressable>
+      </View>
+    </View>
+  );
 
   const renderFooter = () => (
     <View style={[styles.footer, { backgroundColor: theme.colors.background, borderTopColor: theme.colors.divider }]}>
@@ -214,44 +257,38 @@ export default function EditProfileModal({ visible, onClose, currentUser, onSave
 
           {activeTab === 'security' && (
             <View style={styles.section}>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Mot de passe actuel</Text>
-                <View style={[styles.iconInputWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-                  <Lock color={theme.colors.textMuted} size={18} style={styles.inputIcon} />
-                  <TextInput
-                    style={[styles.iconTextInput, { color: theme.colors.text }]}
-                    placeholder="Saisissez votre mot de passe actuel"
-                    placeholderTextColor={theme.colors.textDisabled}
-                    secureTextEntry
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                  />
-                </View>
-              </View>
+              {/* Utilisation du composant réutilisable pour une UI cohérente */}
+              
+              <PasswordInput 
+                label="Mot de passe actuel"
+                value={currentPassword}
+                onChange={setCurrentPassword}
+                placeholder="Saisissez votre mot de passe actuel"
+                isVisible={showCurrentPassword}
+                onToggleVisibility={() => setShowCurrentPassword(!showCurrentPassword)}
+                LeftIcon={Lock} // Icône Cadenas à gauche conservée
+              />
 
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Nouveau mot de passe</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.border }]}
-                  placeholder="Minimum 6 caracteres"
-                  placeholderTextColor={theme.colors.textDisabled}
-                  secureTextEntry
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                />
-              </View>
+              <PasswordInput 
+                label="Nouveau mot de passe"
+                value={newPassword}
+                onChange={setNewPassword}
+                placeholder="Minimum 6 caracteres"
+                isVisible={showNewPassword}
+                onToggleVisibility={() => setShowNewPassword(!showNewPassword)}
+                // Pas d'icône à gauche pour épuré
+              />
 
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Confirmer le mot de passe</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.border }]}
-                  placeholder="Re-saisissez le mot de passe"
-                  placeholderTextColor={theme.colors.textDisabled}
-                  secureTextEntry
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                />
-              </View>
+              <PasswordInput 
+                label="Confirmer le mot de passe"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                placeholder="Re-saisissez le mot de passe"
+                isVisible={showConfirmPassword}
+                onToggleVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
+                // Pas d'icône à gauche pour épuré
+              />
+
             </View>
           )}
         </ScrollView>
@@ -276,6 +313,8 @@ const styles = StyleSheet.create({
   textInput: { height: 50, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, fontSize: 15, fontWeight: '500' },
   iconInputWrapper: { flexDirection: 'row', alignItems: 'center', height: 50, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16 },
   inputIcon: { marginRight: 10 },
+  // NOUVEAU style pour le bouton cliquable de l'œil à droite
+  rightIconPressable: { padding: 5, marginLeft: 10 },
   iconTextInput: { flex: 1, fontSize: 15, fontWeight: '500', height: '100%' },
   textArea: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, fontWeight: '500', minHeight: 100, textAlignVertical: 'top' },
   footer: { padding: 16, borderTopWidth: 1 },
