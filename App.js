@@ -1,13 +1,13 @@
-// App.js
-import React from 'react';
+//App.js
+import React, { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { Provider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 
 // --- POLYFILLS GLOBAUX POUR REACT NATIVE ---
-// Corrige le crash RTK Query au resetApiState() (AbortSignal.abort is not a function)
 if (typeof global.AbortSignal === 'undefined') {
   global.AbortSignal = class AbortSignal {};
 }
@@ -32,14 +32,21 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { useAppTheme } from './src/theme/theme';
 import { navigationRef } from './src/navigation/NavigationService';
 
+// Configuration du gestionnaire de notifications en arriere-plan/premier plan
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 export default function App() {
   const scheme = useColorScheme();
   const theme = useAppTheme();
 
-  // On récupère le thème de base (v7) pour hériter de sa structure (notamment l'objet 'fonts' obligatoire)
   const baseNavigationTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
-  // Création d'un pont sécurisé entre notre theme dynamique et le navigateur natif
   const navigationTheme = {
     ...baseNavigationTheme,
     colors: {
@@ -52,6 +59,24 @@ export default function App() {
       notification: theme.colors.error,
     },
   };
+
+  useEffect(() => {
+    // Ecouteur pour intercepter le clic sur une notification Push
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      const payload = response.notification.request.content.data;
+      
+      if (payload && payload.type === 'RESOURCE_LINK' && payload.resourceId) {
+        // Redirection directe via notre reference de navigation globale
+        if (navigationRef.isReady()) {
+          navigationRef.navigate(payload.screen || 'ResourceDetail', { resourceId: payload.resourceId });
+        }
+      }
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(responseListener);
+    };
+  }, []);
 
   return (
     <Provider store={store}>

@@ -1,4 +1,4 @@
-// src/screens/profile/MenuScreen.jsx
+//src/screens/profile/MenuScreen.jsx
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import LogoutModal from '../../components/profile/LogoutModal';
 import { useAppTheme } from '../../theme/theme';
 
 import { useUpdateProfileMutation, useLogoutMutation } from '../../store/api/authApiSlice';
+import { useGetMyFollowStatsQuery } from '../../store/api/socialApiSlice';
 import { updateUser, performLogout } from '../../store/slices/authSlice';
 import socketService from '../../services/socketService';
 
@@ -26,6 +27,9 @@ export default function MenuScreen({ navigation }) {
 
   const [updateProfileApi, { isLoading: isUpdating }] = useUpdateProfileMutation();
   const [logoutApi, { isLoading: isLoggingOut }] = useLogoutMutation();
+  
+  const { data: statsResponse } = useGetMyFollowStatsQuery();
+  const stats = statsResponse?.data || { followersCount: 0, followingCount: 0 };
 
   const handleUpdateProfile = async (updatedData) => {
     try {
@@ -82,6 +86,18 @@ export default function MenuScreen({ navigation }) {
             </View>
           </View>
           
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.followersCount}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Abonnes</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.followingCount}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Abonnements</Text>
+            </View>
+          </View>
+
           <Pressable 
             style={[styles.editButton, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
             onPress={() => setIsEditModalVisible(true)}
@@ -90,7 +106,6 @@ export default function MenuScreen({ navigation }) {
           </Pressable>
         </View>
 
-        {/* NOUVELLE SECTION : Mes Contributions */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Mes Contributions</Text>
         <View style={[styles.menuBlock, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <MenuItem 
@@ -152,6 +167,11 @@ const styles = StyleSheet.create({
   profileTextContainer: { flex: 1 },
   pseudo: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
   email: { fontSize: 14, fontWeight: '500' },
+  statsContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', marginBottom: 20, paddingVertical: 10 },
+  statItem: { alignItems: 'center', flex: 1 },
+  statValue: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  statLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase' },
+  statDivider: { width: 1, height: '80%' },
   editButton: { paddingVertical: 12, borderRadius: 16, borderWidth: 1, alignItems: 'center' },
   editButtonText: { fontSize: 15, fontWeight: '700' },
   sectionTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', marginLeft: 16, marginBottom: 8, marginTop: 10 },
