@@ -41,7 +41,9 @@ export default function RessourcesScreen({ navigation }) {
   const [queryArgs, setQueryArgs] = useState({ page: 1, limit: 20 });
   const queryArgsRef = useRef(queryArgs);
   const prevTrigger = useRef(scrollTrigger);
-  const lastScrolledState = useRef(false);
+  
+  // CORRECTION : Memoire UI rapide
+  const isScrolledUI = useSharedValue(false);
 
   const [activeOptionsResource, setActiveOptionsResource] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,16 +101,20 @@ export default function RessourcesScreen({ navigation }) {
   }, []);
 
   const updateScrollState = useCallback((isScrolled) => {
-    if (lastScrolledState.current !== isScrolled) {
-      lastScrolledState.current = isScrolled;
-      dispatch(setScreenScrolled({ screenName: 'Ressources', isScrolled }));
-    }
+    dispatch(setScreenScrolled({ screenName: 'Ressources', isScrolled }));
   }, [dispatch]);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => { 
       scrollY.value = event.contentOffset.y; 
-      runOnJS(updateScrollState)(event.contentOffset.y > 200);
+      
+      const currentlyScrolled = event.contentOffset.y > 200;
+      
+      // Envoi du message a Redux uniquement si changement
+      if (isScrolledUI.value !== currentlyScrolled) {
+        isScrolledUI.value = currentlyScrolled;
+        runOnJS(updateScrollState)(currentlyScrolled);
+      }
     },
   });
 
@@ -131,10 +137,11 @@ export default function RessourcesScreen({ navigation }) {
       
       setTimeout(() => {
         setIsSmartRefreshing(false); 
+        isScrolledUI.value = false;
         updateScrollState(false);
       }, 800);
     }
-  }, [scrollTrigger, updateScrollState]);
+  }, [scrollTrigger, updateScrollState, isScrolledUI]);
 
   const handleConfirmDelete = async () => {
     if (!resourceToDelete) return;

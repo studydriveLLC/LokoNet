@@ -1,5 +1,5 @@
 //src/screens/profile/MenuScreen.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Settings, Bell, ShieldQuestion, UserCheck, LogOut, FileText } from 'lucide-react-native';
@@ -14,6 +14,7 @@ import { useUpdateProfileMutation, useLogoutMutation } from '../../store/api/aut
 import { useGetMyFollowStatsQuery } from '../../store/api/socialApiSlice';
 import { updateUser, performLogout } from '../../store/slices/authSlice';
 import socketService from '../../services/socketService';
+import { apiSlice } from '../../store/slices/apiSlice';
 
 export default function MenuScreen({ navigation }) {
   const theme = useAppTheme();
@@ -30,6 +31,23 @@ export default function MenuScreen({ navigation }) {
   
   const { data: statsResponse } = useGetMyFollowStatsQuery();
   const stats = statsResponse?.data || { followersCount: 0, followingCount: 0 };
+
+  useEffect(() => {
+    const socket = socketService.socket || socketService;
+    if (!socket || typeof socket.on !== 'function') return;
+
+    const handleStatsUpdate = () => {
+      dispatch(apiSlice.util.invalidateTags(['FollowStats']));
+    };
+
+    socket.on('follow_stats_updated', handleStatsUpdate);
+
+    return () => {
+      if (typeof socket.off === 'function') {
+        socket.off('follow_stats_updated', handleStatsUpdate);
+      }
+    };
+  }, [dispatch]);
 
   const handleUpdateProfile = async (updatedData) => {
     try {

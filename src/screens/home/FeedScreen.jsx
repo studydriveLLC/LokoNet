@@ -71,8 +71,10 @@ export default function FeedScreen({ navigation }) {
   const scrollTrigger = useSelector((state) => state.ui.scrollState['PourToi']?.trigger || 0);
   
   const listRef = useRef(null);
-  const lastScrolledState = useRef(false);
   const prevTrigger = useRef(scrollTrigger);
+
+  // CORRECTION : On cree une memoire rapide pour le cerveau UI
+  const isScrolledUI = useSharedValue(false);
 
   useScrollToTop(listRef);
 
@@ -89,16 +91,21 @@ export default function FeedScreen({ navigation }) {
   const transformedPosts = posts.map(mapPostFromBackend);
 
   const updateScrollState = useCallback((isScrolled) => {
-    if (lastScrolledState.current !== isScrolled) {
-      lastScrolledState.current = isScrolled;
-      dispatch(setScreenScrolled({ screenName: 'PourToi', isScrolled }));
-    }
+    dispatch(setScreenScrolled({ screenName: 'PourToi', isScrolled }));
   }, [dispatch]);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollY.value = event.contentOffset.y;
-      runOnJS(updateScrollState)(event.contentOffset.y > 200);
+      
+      // CORRECTION : On calcule si on depasse 200
+      const currentlyScrolled = event.contentOffset.y > 200;
+      
+      // On n'envoie le message a Redux QUE SI l'etat a change (1 seul message)
+      if (isScrolledUI.value !== currentlyScrolled) {
+        isScrolledUI.value = currentlyScrolled;
+        runOnJS(updateScrollState)(currentlyScrolled);
+      }
     },
   });
 
@@ -127,10 +134,12 @@ export default function FeedScreen({ navigation }) {
       
       setTimeout(() => {
         setIsSmartRefreshing(false);
+        // On remet a zero la memoire UI et JS
+        isScrolledUI.value = false;
         updateScrollState(false); 
       }, 800);
     }
-  }, [scrollTrigger, updateScrollState]);
+  }, [scrollTrigger, updateScrollState, isScrolledUI]);
 
   const handleLike = async (postId) => {
     try {
