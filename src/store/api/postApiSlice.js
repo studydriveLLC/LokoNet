@@ -1,3 +1,4 @@
+//src/store/api/postApiSlice.js
 import { apiSlice } from '../slices/apiSlice';
 
 export const postApiSlice = apiSlice.injectEndpoints({
@@ -11,6 +12,18 @@ export const postApiSlice = apiSlice.injectEndpoints({
         return response.data?.posts || [];
       },
       providesTags: ['Post'],
+    }),
+
+    // NOUVELLE REQUETE : Recuperer les posts d'un utilisateur specifique
+    getUserPosts: builder.query({
+      query: ({ userId, page = 1, limit = 10 }) => ({
+        url: `/v1/social/user-posts/${userId}`,
+        params: { page, limit },
+      }),
+      transformResponse: (response) => {
+        return response.data?.posts || [];
+      },
+      providesTags: (result, error, arg) => [{ type: 'UserPosts', id: arg.userId }],
     }),
 
     createPost: builder.mutation({
@@ -33,7 +46,7 @@ export const postApiSlice = apiSlice.injectEndpoints({
           console.log('Erreur silencieuse creation post:', error);
         }
       },
-      invalidatesTags: ['Post'],
+      invalidatesTags: ['Post', 'UserPosts'],
     }),
 
     deletePost: builder.mutation({
@@ -41,7 +54,7 @@ export const postApiSlice = apiSlice.injectEndpoints({
         url: `/v1/social/posts/${postId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Post'],
+      invalidatesTags: ['Post', 'UserPosts'],
     }),
 
     toggleLike: builder.mutation({
@@ -89,7 +102,7 @@ export const postApiSlice = apiSlice.injectEndpoints({
           console.log('Erreur silencieuse ajout commentaire:', error);
         }
       },
-      invalidatesTags: ['Post'],
+      invalidatesTags: ['Post', 'UserPosts'],
     }),
   }),
   overrideExisting: true,
@@ -97,6 +110,7 @@ export const postApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useGetFeedQuery,
+  useGetUserPostsQuery, // EXPORT DU NOUVEAU HOOK
   useCreatePostMutation,
   useDeletePostMutation,
   useToggleLikeMutation,

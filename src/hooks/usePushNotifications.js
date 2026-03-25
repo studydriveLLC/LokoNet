@@ -1,5 +1,5 @@
 //src/hooks/usePushNotifications.js
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -9,13 +9,14 @@ import { useRegisterPushTokenMutation } from '../store/api/notificationApiSlice'
 export const usePushNotifications = () => {
   const { user } = useSelector((state) => state.auth);
   const [registerToken] = useRegisterPushTokenMutation();
+  const notificationListener = useRef();
+  const responseListener = useRef();
 
   useEffect(() => {
     if (!user) return; 
 
     const registerForPushNotificationsAsync = async () => {
       try {
-        // PROTECTION ARCHITECTURE : Bypass si on est dans Expo Go (SDK 53+)
         if (Constants.appOwnership === 'expo') {
           console.log('[Push] Mode Expo Go detecte. Generation du token FCM ignoree pour eviter le crash.');
           return;
@@ -56,5 +57,22 @@ export const usePushNotifications = () => {
     };
 
     registerForPushNotificationsAsync();
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification recu au premier plan', notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification cliquee', response);
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+      }
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
+    };
   }, [user, registerToken]);
 };

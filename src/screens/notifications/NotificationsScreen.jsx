@@ -9,6 +9,7 @@ import { useDispatch } from 'react-redux';
 import { useAppTheme } from '../../theme/theme';
 import { showSuccessToast, showErrorToast } from '../../store/slices/uiSlice';
 import ScrollToTopButton from '../../components/ui/ScrollToTopButton';
+import SkeletonNotificationCard from '../../components/notifications/SkeletonNotificationCard';
 import { 
   useGetNotificationsQuery, 
   useMarkAsReadMutation, 
@@ -234,7 +235,15 @@ export default function NotificationsScreen({ navigation }) {
         onScroll={handleScroll}
         scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={isFetching && !isLoading} onRefresh={refetch} tintColor={theme.colors.primary} />}
-        ListEmptyComponent={() => (!isLoading ? <EmptyStateAnimation theme={theme} /> : null)}
+        ListEmptyComponent={() => (
+          isLoading ? (
+            <View>
+              {[1, 2, 3, 4, 5, 6].map((key) => <SkeletonNotificationCard key={key} />)}
+            </View>
+          ) : (
+            <EmptyStateAnimation theme={theme} />
+          )
+        )}
       />
 
       {showScrollTop && (

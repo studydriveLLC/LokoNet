@@ -1,7 +1,8 @@
+//src/navigation/AppNavigator.jsx
 import React, { useEffect } from 'react';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { useSelector, useDispatch } from 'react-redux';
-import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getToken } from '../store/secureStoreAdapter';
 
@@ -17,6 +18,8 @@ import MainTabNavigator from './MainTabNavigator';
 import MenuScreen from '../screens/profile/MenuScreen';
 import MyResourcesScreen from '../screens/profile/MyResourcesScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen'; 
+import ResourceDetailScreen from '../screens/ressources/ResourceDetailScreen';
+import UserProfileScreen from '../screens/profile/UserProfileScreen'; // NOUVEL IMPORT ICI
 import ErrorToast from '../components/ui/ErrorToast';
 import SuccessToast from '../components/ui/SuccessToast';
 import TopInsetBox from '../components/ui/TopInsetBox';
@@ -40,13 +43,6 @@ const immersiveFadeInterpolator = ({ current }) => ({
   cardStyle: { opacity: current.progress },
 });
 
-const PlaceholderProfileScreen = ({ route }) => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Profil (En construction)</Text>
-    <Text>ID de l'utilisateur : {route.params?.userId}</Text>
-  </View>
-);
-
 export default function AppNavigator() {
   const dispatch = useDispatch();
   const theme = useAppTheme();
@@ -63,7 +59,7 @@ export default function AppNavigator() {
 
         if (token && userDataStr) {
           let savedUser = null;
-          try { savedUser = JSON.parse(userDataStr); } catch (parseError) { console.error('[Boot] Erreur', parseError); }
+          try { savedUser = JSON.parse(userDataStr); } catch (parseError) {}
           
           dispatch(restoreAuth({ user: savedUser, token, refreshToken }));
           socketService.connect(token);
@@ -139,7 +135,11 @@ export default function AppNavigator() {
           ) : (
             <>
               <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-              <Stack.Screen name="Profile" component={PlaceholderProfileScreen} />
+              
+              {/* VRAI PROFIL INTEGRÉ ICI */}
+              <Stack.Screen name="Profile" component={UserProfileScreen} />
+              
+              <Stack.Screen name="ResourceDetail" component={ResourceDetailScreen} />
               <Stack.Screen
                 name="Menu"
                 component={MenuScreen}

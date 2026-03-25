@@ -1,4 +1,4 @@
-// src/store/api/resourceApiSlice.js
+//src/store/api/resourceApiSlice.js
 import { apiSlice } from '../slices/apiSlice';
 
 export const resourceApiSlice = apiSlice.injectEndpoints({
@@ -17,7 +17,8 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
     }),
 
     getResources: builder.query({
-      query: ({ page = 1, limit = 20, category, level, search, sort } = {}) => {
+      // AJOUT du paramètre uploadedBy pour filtrer par utilisateur
+      query: ({ page = 1, limit = 20, category, level, search, sort, uploadedBy } = {}) => {
         const params = new URLSearchParams();
         params.append('page', page);
         params.append('limit', limit);
@@ -25,6 +26,8 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
         if (level) params.append('level', level);
         if (search) params.append('search', search);
         if (sort) params.append('sort', sort);
+        if (uploadedBy) params.append('uploadedBy', uploadedBy); 
+        
         return { url: `/v1/resources?${params.toString()}` };
       },
       transformResponse: (response) => {
@@ -108,14 +111,12 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
       }
     }),
 
-    // NOUVEAU : Mutation pour gerer le compteur de partages
     logShare: builder.mutation({
       query: (id) => ({ url: `/v1/resources/${id}/share`, method: 'PATCH' }),
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
             const resource = draft.find(r => String(r._id) === String(id));
-            // Mise a jour optimiste du compteur pour eviter la latence UI
             if (resource) resource.shares = (resource.shares || 0) + 1;
           })
         );

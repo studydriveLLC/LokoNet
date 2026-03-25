@@ -61,8 +61,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Ecouteur pour intercepter le clic sur une notification Push
-    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+    // L'API renvoie un objet de souscription (subscription) que l'on stocke
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
       const payload = response.notification.request.content.data;
       
       if (payload && payload.type === 'RESOURCE_LINK' && payload.resourceId) {
@@ -74,7 +74,10 @@ export default function App() {
     });
 
     return () => {
-      Notifications.removeNotificationSubscription(responseListener);
+      // Nettoyage correct en appelant la methode .remove() de l'objet
+      if (responseSubscription) {
+        responseSubscription.remove();
+      }
     };
   }, []);
 
