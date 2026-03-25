@@ -12,7 +12,6 @@ const SOCKET_URL = getBaseOrigin(rawBaseUrl);
 
 class SocketService {
   constructor() {
-    // Fusion du pattern Yely avec la survie au Fast Refresh d'Expo
     if (!global.__LOKONET_SOCKET__) {
       this.socket = null;
       this.isConnected = false;
@@ -24,24 +23,32 @@ class SocketService {
     return global.__LOKONET_SOCKET__;
   }
 
-  connect(token) {
-    if (!token || !SOCKET_URL) return;
+  // On passe en async pour respecter l'ancienne signature attendue par les composants
+  async connect(tokenParam) {
+    let token = tokenParam;
+    
+    // RETROCOMPATIBILITE : Si un composant appelle connect() sans token (l'ancienne methode)
+    if (!token) {
+      const { getToken } = require('../store/secureStoreAdapter');
+      token = await getToken('accessToken');
+    }
+
+    if (!token || !SOCKET_URL) return null;
 
     if (this.socket?.connected) {
       if (this.socket.auth.token !== token) {
         this.socket.auth.token = token;
         this.socket.disconnect().connect();
       }
-      return;
+      return this.socket; // RETROCOMPATIBILITE : On renvoie l'objet brut
     }
 
     if (this.socket) {
       this.socket.auth.token = token;
       this.socket.connect();
-      return;
+      return this.socket; // RETROCOMPATIBILITE
     }
 
-    // Connexion propre, sans promesse asynchrone bloquante
     this.socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket'],
@@ -52,12 +59,13 @@ class SocketService {
       timeout: 20000,
     });
 
-    // Re-attachement automatique des ecouteurs lors de la creation
     this._listeners.forEach(({ event, callback }) => {
       this.socket.on(event, callback);
     });
 
     this._setupCoreListeners();
+
+    return this.socket; // RETROCOMPATIBILITE : Indispensable pour tes hooks UI !
   }
 
   updateToken(newToken) {
@@ -81,6 +89,19 @@ class SocketService {
     }
   }
 
+  async forceReconnect() {
+    console.log('[Socket] Reconnexion forcee demandee...');
+    if (this.socket) {
+      this.socket.disconnect();
+    }
+    return await this.connect(); // On retourne le socket ici aussi
+  }
+
+  // Methode de secours au cas ou un composant utiliserait getSocket()
+  getSocket() {
+    return this.socket;
+  }
+
   _setupCoreListeners() {
     if (!this.socket) return;
 
@@ -99,7 +120,6 @@ class SocketService {
       console.log('[Socket] Erreur de connexion:', error.message);
       
       if (error.message === 'Token invalide ou expire' || error.message === 'Authentification requise') {
-        // Securite anti-spam temporelle
         if (!this.refreshTimeout) {
            console.log('[Socket] Declenchement protege du rafraichissement silencieux...');
            const { store } = require('../store/store');
