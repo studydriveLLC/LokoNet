@@ -1,6 +1,6 @@
 // src/screens/ressources/RessourcesScreen.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl, AppState, Share } from 'react-native';
+import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl, AppState, Share, Keyboard } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
@@ -78,20 +78,54 @@ export default function RessourcesScreen({ navigation }) {
     return () => subscription.remove();
   }, []);
 
+  // ECOUTEUR DE RECHERCHE GLOBALE : Met a jour l'appel API automatiquement
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', async (event) => {
-      if (event.routeName !== 'Ressources' || isFetchingRef.current) return;
-      isFetchingRef.current = true;
-      setIsSmartRefreshing(true);
-      if (listRef.current) {
-        if (typeof listRef.current.scrollToOffset === 'function') listRef.current.scrollToOffset({ offset: 0, animated: true });
-        else if (listRef.current.getNode && typeof listRef.current.getNode().scrollToOffset === 'function') listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
+    const subscription = DeviceEventEmitter.addListener('EXECUTE_SEARCH', ({ query }) => {
+      setQueryArgs(prev => {
+        const newArgs = { ...prev, page: 1 };
+        if (query) {
+          newArgs.search = query;
+        } else {
+          delete newArgs.search; // Si on annule, on supprime le filtre
+        }
+        return newArgs;
+      });
+      // Optionnel : remonter la liste quand on cherche
+      if (listRef.current?.scrollToOffset) {
+        listRef.current.scrollToOffset({ offset: 0, animated: true });
       }
-      try { await refetch(); } catch (error) {} 
-      finally { setIsSmartRefreshing(false); isFetchingRef.current = false; }
     });
     return () => subscription.remove();
-  }, [refetch]);
+  }, []);
+
+  // LE CŒUR DE L'UX NIVEAU 8
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', (event) => {
+      if (event.routeName !== 'Ressources' || isFetchingRef.current) return;
+      
+      isFetchingRef.current = true;
+      setIsSmartRefreshing(true); 
+
+      requestAnimationFrame(() => {
+        try {
+          if (listRef.current?.scrollToOffset) {
+            listRef.current.scrollToOffset({ offset: 0, animated: true });
+          } else if (listRef.current?.scrollTo) {
+            listRef.current.scrollTo({ y: 0, animated: true });
+          } else if (listRef.current?.getNode?.()?.scrollToOffset) {
+            listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
+          }
+        } catch (error) {}
+      });
+      
+      setTimeout(() => {
+        setIsSmartRefreshing(false); 
+        isFetchingRef.current = false;
+      }, 800);
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => { scrollY.value = event.contentOffset.y; },
@@ -137,7 +171,8 @@ export default function RessourcesScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <AnimatedHeader scrollY={scrollY} title="Ressources" navigation={navigation} />
+      <AnimatedHeader scrollY={scrollY} navigation={navigation} />
+      
       <SmartRefreshOverlay isVisible={isSmartRefreshing} />
 
       {isLoading && resources.length === 0 ? (
@@ -146,6 +181,8 @@ export default function RessourcesScreen({ navigation }) {
           keyExtractor={(item) => item.toString()}
           contentContainerStyle={{ paddingTop: 140 + insets.top, paddingBottom: 100 }}
           renderItem={() => <SkeletonResourceCard />}
+          keyboardShouldPersistTaps="handled" // Permet de fermer le clavier au clic sur la liste
+          keyboardDismissMode="on-drag" // Ferme le clavier automatiquement au scroll
         />
       ) : (
         <Animated.FlatList
@@ -155,6 +192,8 @@ export default function RessourcesScreen({ navigation }) {
           onScroll={scrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled" // ICI : C'est ce qui ferme le clavier si on touche "n'importe ou ailleurs"
+          keyboardDismissMode="on-drag" // ICI : C'est ce qui ferme le clavier si on scrolle
           contentContainerStyle={{ paddingTop: 140 + insets.top, paddingBottom: 100 }}
           renderItem={({ item }) => (
             <ResourceCard
@@ -169,7 +208,7 @@ export default function RessourcesScreen({ navigation }) {
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
-                {isError ? 'Erreur lors du chargement' : 'Aucune ressource disponible'}
+                {isError ? 'Erreur lors du chargement' : 'Aucune ressource correspondante'}
               </Text>
               <Pressable style={[styles.retryButton, { backgroundColor: theme.colors.primary }]} onPress={refetch}>
                 <Text style={[styles.retryText, { color: theme.colors.surface }]}>Reessayer</Text>

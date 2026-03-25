@@ -1,73 +1,57 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  withDelay,
-  FadeIn,
-  FadeOut
-} from 'react-native-reanimated';
+// src/components/ui/SmartRefreshOverlay.jsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useAppTheme } from '../../theme/theme';
-
-const Dot = ({ delay, color }) => {
-  const opacity = useSharedValue(0.3);
-  const scale = useSharedValue(0.8);
-
-  useEffect(() => {
-    opacity.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: 300 }),
-          withTiming(0.3, { duration: 300 })
-        ),
-        -1,
-        true
-      )
-    );
-    scale.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(1.2, { duration: 300 }),
-          withTiming(0.8, { duration: 300 })
-        ),
-        -1,
-        true
-      )
-    );
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
-
-  return <Animated.View style={[styles.dot, { backgroundColor: color }, style]} />;
-};
 
 export default function SmartRefreshOverlay({ isVisible }) {
   const theme = useAppTheme();
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [dots, setDots] = useState('');
 
-  if (!isVisible) return null;
+  useEffect(() => {
+    let interval;
+    if (isVisible) {
+      // Apparition douce
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+
+      // Animation des 3 points (...)
+      interval = setInterval(() => {
+        setDots(prev => (prev.length >= 3 ? '' : prev + '.'));
+      }, 300);
+    } else {
+      // Disparition douce
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setDots('');
+    }
+
+    return () => clearInterval(interval);
+  }, [isVisible, fadeAnim]);
+
+  // Si l'overlay est invisible et que l'animation est finie, on ne rend rien pour ne pas bloquer les clics
+  if (!isVisible && fadeAnim._value === 0) return null;
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(200)}
-      exiting={FadeOut.duration(300)}
-      style={[styles.overlay, { backgroundColor: theme.colors.background }]}
+    <Animated.View 
+      style={[
+        styles.overlay, 
+        { 
+          backgroundColor: theme.colors.background, // Cache completement l'ecran
+          opacity: fadeAnim 
+        }
+      ]}
+      pointerEvents={isVisible ? "auto" : "none"} // Bloque les clics pendant l'actualisation
     >
-      <View style={styles.content}>
-        <View style={styles.dotsContainer}>
-          <Dot delay={0} color={theme.colors.primary} />
-          <Dot delay={150} color={theme.colors.primary} />
-          <Dot delay={300} color={theme.colors.primary} />
-        </View>
-        <Text style={[styles.text, { color: theme.colors.text }]}>Actualisation</Text>
-      </View>
+      <Text style={[styles.text, { color: theme.colors.primary }]}>
+        Actualisation{dots}
+      </Text>
     </Animated.View>
   );
 }
@@ -75,27 +59,12 @@ export default function SmartRefreshOverlay({ isVisible }) {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 990, // Sous le header qui est a 1000, mais au-dessus de la liste
-    elevation: 990,
+    zIndex: 9999, // Doit etre au dessus de tout
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
-    alignItems: 'center',
-    transform: [{ translateY: -30 }], 
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
   text: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     letterSpacing: 0.5,
   }

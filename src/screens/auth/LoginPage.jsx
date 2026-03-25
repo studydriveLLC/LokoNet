@@ -1,3 +1,5 @@
+// src/screens/auth/LoginPage.jsx
+
 import React, { useState } from 'react';
 import { 
   View, 
@@ -14,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoginMutation } from '../../store/api/authApiSlice';
 import { setCredentials } from '../../store/slices/authSlice';
 import { showErrorToast } from '../../store/slices/uiSlice';
-import { saveToken } from '../../store/secureStoreAdapter';
 import { useAppTheme } from '../../theme/theme';
 import AnimatedInput from '../../components/ui/AnimatedInput';
 import AnimatedButton from '../../components/ui/AnimatedButton';
@@ -35,13 +36,17 @@ export default function LoginPage({ navigation }) {
     }
 
     try {
-      // Optimisation : On envoie l'identifiant trimmé pour eviter les bugs d'espaces invisibles
       const response = await login({ identifier: identifier.trim(), password }).unwrap();
-      const { accessToken, user } = response.data;
+      
+      // CORRECTION : Extraction explicite du refreshToken fourni par le backend
+      const { accessToken, refreshToken, user } = response.data;
 
-      await saveToken('accessToken', accessToken);
-      await saveToken('userData', JSON.stringify(user)); 
-      dispatch(setCredentials({ user, token: accessToken }));
+      // CORRECTION : On delegue la sauvegarde (SecureStore) a authSlice.js pour eviter les doublons
+      dispatch(setCredentials({ 
+        user, 
+        token: accessToken,
+        refreshToken: refreshToken 
+      }));
 
     } catch (error) {
       dispatch(showErrorToast({ 

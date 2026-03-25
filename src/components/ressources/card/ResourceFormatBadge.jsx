@@ -1,6 +1,7 @@
 // src/components/ressources/card/ResourceFormatBadge.jsx
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { FileText } from 'lucide-react-native';
 import { useAppTheme } from '../../../theme/theme';
 
 const formatBytesToMB = (bytes) => {
@@ -25,9 +26,9 @@ export default function ResourceFormatBadge({ format, fileSize, fileSizeMBFallba
   const formatColor = getFormatColor(format, theme.colors.primary);
 
   return (
-    <View style={styles.formatBadgeContainer}>
-      <View style={[styles.formatDot, { backgroundColor: formatColor }]} />
-      <Text style={[styles.formatText, { color: theme.colors.textMuted }]}>
+    <View style={[styles.badge, { backgroundColor: `${formatColor}15` }]}>
+      <FileText color={formatColor} size={14} />
+      <Text style={[styles.formatText, { color: formatColor }]}>
         {format?.toUpperCase()} - {fileSizeMB} MB
       </Text>
     </View>
@@ -35,20 +36,6 @@ export default function ResourceFormatBadge({ format, fileSize, fileSizeMBFallba
 }
 
 const styles = StyleSheet.create({
-  formatBadgeContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginRight: 4 
-  },
-  formatDot: { 
-    width: 8, 
-    height: 8, 
-    borderRadius: 4, 
-    marginRight: 6 
-  },
-  formatText: { 
-    fontSize: 12, 
-    fontWeight: '700', 
-    letterSpacing: 0.5 
-  },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  formatText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
 });

@@ -1,10 +1,9 @@
 // src/components/ressources/card/ResourceAuthor.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import RoleBadge from '../../ui/RoleBadge';
 import { useAppTheme } from '../../../theme/theme';
 
-// Formateur de temps relatif natif (zéro dépendance lourde)
 const timeAgo = (dateInput) => {
   if (!dateInput) return '';
   const seconds = Math.floor((new Date() - new Date(dateInput)) / 1000);
@@ -19,11 +18,24 @@ const timeAgo = (dateInput) => {
   if (interval > 1) return Math.floor(interval) + ' h';
   interval = seconds / 60;
   if (interval > 1) return Math.floor(interval) + ' min';
-  return "À l'instant";
+  return "A l'instant";
 };
 
 export default function ResourceAuthor({ user, createdAt }) {
   const theme = useAppTheme();
+  const [relativeTime, setRelativeTime] = useState(timeAgo(createdAt));
+
+  // UX Bank Grade : Actualisation autonome toutes les minutes sans bloquer le thread principal
+  useEffect(() => {
+    setRelativeTime(timeAgo(createdAt)); 
+    
+    const intervalId = setInterval(() => {
+      setRelativeTime(timeAgo(createdAt));
+    }, 60000); // 60 000 ms = 1 minute exacte
+
+    // Nettoyage vital pour eviter les fuites de memoire quand la carte n'est plus a l'ecran
+    return () => clearInterval(intervalId);
+  }, [createdAt]);
   
   if (!user) return null;
   const avatarUrl = user.avatar || 'https://ui-avatars.com/api/?name=User&background=random';
@@ -39,7 +51,7 @@ export default function ResourceAuthor({ user, createdAt }) {
           <RoleBadge role={user.role} isVerified={user.isVerified} customBadge={user.badge} size={14} />
         </View>
         <Text style={[styles.date, { color: theme.colors.textMuted }]}>
-          {timeAgo(createdAt)}
+          {relativeTime}
         </Text>
       </View>
     </View>

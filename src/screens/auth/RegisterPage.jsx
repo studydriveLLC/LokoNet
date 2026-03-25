@@ -1,3 +1,5 @@
+// src/screens/auth/RegisterPage.jsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
@@ -16,7 +18,6 @@ import { Check } from 'lucide-react-native';
 import { useRegisterMutation } from '../../store/api/authApiSlice';
 import { setCredentials } from '../../store/slices/authSlice';
 import { showErrorToast } from '../../store/slices/uiSlice';
-import { saveToken } from '../../store/secureStoreAdapter';
 import { useAppTheme } from '../../theme/theme';
 import AnimatedInput from '../../components/ui/AnimatedInput';
 import AnimatedButton from '../../components/ui/AnimatedButton';
@@ -111,13 +112,17 @@ export default function RegisterPage({ navigation }) {
 
     try {
       const response = await register(submitData).unwrap();
-      const { accessToken, user } = response.data;
       
-      await saveToken('accessToken', accessToken);
-      await saveToken('userData', JSON.stringify(user)); // Sauvegarde vitale pour le redemarrage
-      dispatch(setCredentials({ user, token: accessToken }));
+      // CORRECTION : Extraction du refreshToken renvoye par le backend
+      const { accessToken, refreshToken, user } = response.data;
+      
+      // CORRECTION : On laisse authSlice gerer le SecureStore (architecture propre)
+      dispatch(setCredentials({ 
+        user, 
+        token: accessToken,
+        refreshToken: refreshToken
+      }));
     } catch (error) {
-      // MOUCHARD FRONTEND NETTOYE
       console.error("[ERREUR API FRONTEND] :", JSON.stringify(error, null, 2));
       
       const errorMessage = error?.data?.errors?.[0]?.message || error?.data?.message || 'Erreur d\'inscription.';

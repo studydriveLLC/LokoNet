@@ -6,6 +6,7 @@ import DownloadProgress from './DownloadProgress';
 import ResourceAuthor from './card/ResourceAuthor';
 import ResourceStats from './card/ResourceStats';
 import ResourceFormatBadge from './card/ResourceFormatBadge';
+import ResourceMetaTags from './card/ResourceMetaTags';
 import { useAppTheme } from '../../theme/theme';
 
 export default function ResourceCard({
@@ -31,7 +32,7 @@ export default function ResourceCard({
 
         <Pressable 
           onPress={() => onView && onView(resource)}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }, styles.contentRow]}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }, styles.contentArea]}
         >
           <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>
             {resource.title}
@@ -39,28 +40,20 @@ export default function ResourceCard({
           <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={3}>
             {resource.description}
           </Text>
+          
+          <View style={styles.tagsContainer}>
+            <ResourceFormatBadge 
+              format={resource.format} 
+              fileSize={resource.fileSize} 
+              fileSizeMBFallback={resource.fileSizeMB} 
+            />
+            <ResourceMetaTags level={resource.level} category={resource.category} />
+          </View>
         </Pressable>
 
         <View style={styles.footerRow}>
-          <View style={styles.leftFooter}>
-            
-            <View style={styles.badgesRow}>
-              <ResourceFormatBadge 
-                format={resource.format} 
-                fileSize={resource.fileSize} 
-                fileSizeMBFallback={resource.fileSizeMB} 
-              />
-              <View style={[styles.badge, { backgroundColor: theme.colors.primaryLight }]}>
-                <Text style={[styles.badgeText, { color: theme.colors.primaryDark }]}>{resource.level}</Text>
-              </View>
-              {resource.category && (
-                <View style={[styles.badge, { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border }]}>
-                  <Text style={[styles.badgeText, { color: theme.colors.textMuted }]} numberOfLines={1}>{resource.category}</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.actionStatsRow}>
+          <View style={styles.actionContainer}>
+            <View style={styles.buttonsRow}>
               <Pressable 
                 onPress={() => onView && onView(resource)}
                 style={({ pressed }) => [
@@ -79,21 +72,24 @@ export default function ResourceCard({
                   <Share2 color={theme.colors.textMuted} size={20} />
                 </Pressable>
               )}
+            </View>
 
+            <View style={styles.statsRow}>
               <ResourceStats 
                 views={resource.views} 
                 downloads={resource.downloads} 
                 shares={resource.shares} 
               />
             </View>
-
           </View>
 
-          <DownloadProgress
-            status={downloadState?.status || 'idle'}
-            progress={downloadState?.progress || 0}
-            onPress={() => onDownloadAction && onDownloadAction(resource)}
-          />
+          <View style={styles.downloadContainer}>
+            <DownloadProgress
+              status={downloadState?.status || 'idle'}
+              progress={downloadState?.progress || 0}
+              onPress={() => onDownloadAction && onDownloadAction(resource)}
+            />
+          </View>
         </View>
       </View>
     </View>
@@ -105,16 +101,20 @@ const styles = StyleSheet.create({
   internalPadding: { paddingHorizontal: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   optionsBtn: { paddingLeft: 10 },
-  contentRow: { marginBottom: 16 },
+  contentArea: { marginBottom: 16 },
   title: { fontSize: 18, fontWeight: '800', marginBottom: 8, lineHeight: 24 },
-  description: { fontSize: 14, lineHeight: 22 },
+  description: { fontSize: 14, lineHeight: 22, marginBottom: 12 },
+  
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  leftFooter: { flex: 1, paddingRight: 10 },
-  badgesRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 12, fontWeight: '700', maxWidth: 120 },
-  actionStatsRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
+  actionContainer: { flexDirection: 'column', gap: 10, flex: 1, paddingRight: 10 },
+  buttonsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statsRow: { marginTop: 2 }, 
+  
   viewButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   viewButtonText: { fontSize: 13, fontWeight: '700' },
-  iconButton: { padding: 6, borderRadius: 8, backgroundColor: 'transparent' }
+  iconButton: { padding: 6, borderRadius: 8, backgroundColor: 'transparent' },
+  
+  downloadContainer: { paddingBottom: 4 }
 });

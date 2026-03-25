@@ -1,9 +1,10 @@
+// src/components/navigation/AnimatedHeader.jsx
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, TextInput, Pressable, DeviceEventEmitter, Text } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, DeviceEventEmitter, Text, Keyboard } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Search, Bell, Menu } from 'lucide-react-native';
+import { Search, Bell, Menu, X } from 'lucide-react-native';
 import { useAppTheme } from '../../theme/theme';
 import { useHeaderAnimations } from './useHeaderAnimations';
 import AnimatedSearchPlaceholder from './AnimatedSearchPlaceholder';
@@ -29,35 +30,51 @@ export default function AnimatedHeader({ scrollY }) {
 
   const shouldHidePlaceholder = isFocused || searchValue.length > 0;
 
+  // L'action devient REELLE : Envoi du signal de recherche
+  const handleSearchSubmit = () => {
+    Keyboard.dismiss(); // On libere l'ecran
+    if (searchValue.trim().length > 0) {
+      DeviceEventEmitter.emit('EXECUTE_SEARCH', { query: searchValue.trim() });
+    }
+  };
+
+  // UX : Vider la recherche d'un simple clic et reset la liste
+  const clearSearch = () => {
+    setSearchValue('');
+    Keyboard.dismiss();
+    DeviceEventEmitter.emit('EXECUTE_SEARCH', { query: '' });
+  };
+
   return (
     <Animated.View style={[styles.container, { backgroundColor: theme.colors.primary }, animations.headerHeight, theme.shadows.medium]}>
       
       <View style={[styles.topRow, { height: 60 }]}>
         <View style={styles.leftSection}>
-          <Animated.View style={[styles.logoContainer, animations.logoTranslateX, animations.logoOpacity]}>
-            <Text style={[styles.logoText, { color: theme.colors.surface }]}>LokoNet</Text>
-          </Animated.View>
-
-          <Animated.View style={[styles.bellContainerAnimated, animations.bellTranslateX, animations.bellOpacity]}>
-            <Pressable onPress={() => console.log('Ouvrir les notifications')} hitSlop={10}>
-              <Bell color={theme.colors.surface} size={24} />
-              <View style={[styles.badge, { backgroundColor: theme.colors.error, borderColor: theme.colors.primary }]} />
-            </Pressable>
-          </Animated.View>
-        </View>
-
-        <View style={styles.centerSection}>
-          <Animated.View style={[styles.miniSearchContainer, animations.miniSearchOpacity]}>
-            <Search color={theme.colors.surface} size={20} />
-          </Animated.View>
+          <Text style={[styles.logoText, { color: theme.colors.surface }]}>LokoNet</Text>
         </View>
 
         <View style={styles.rightSection}>
-          <Pressable 
-            onPress={() => navigation.navigate('Menu')} 
-            style={styles.iconButton} 
-            hitSlop={10}
-          >
+          <Animated.View style={[animations.miniSearchOpacity, animations.miniSearchTranslateX]}>
+            <Pressable 
+              onPress={() => {
+                // Focus rapide sur la recherche quand on clique sur la mini-loupe
+                if (listRef?.current?.scrollToOffset) {
+                  listRef.current.scrollToOffset({ offset: 0, animated: true });
+                }
+              }} 
+              hitSlop={10} 
+              style={styles.iconButton}
+            >
+              <Search color={theme.colors.surface} size={24} />
+            </Pressable>
+          </Animated.View>
+
+          <Pressable onPress={() => console.log('Ouvrir les notifications')} hitSlop={10} style={styles.iconButton}>
+            <Bell color={theme.colors.surface} size={24} />
+            <View style={[styles.badge, { backgroundColor: theme.colors.error, borderColor: theme.colors.primary }]} />
+          </Pressable>
+
+          <Pressable onPress={() => navigation.navigate('Menu')} hitSlop={10} style={styles.iconButton}>
             <Menu color={theme.colors.surface} size={28} />
           </Pressable>
         </View>
@@ -74,9 +91,18 @@ export default function AnimatedHeader({ scrollY }) {
             onChangeText={setSearchValue}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
+            onSubmitEditing={handleSearchSubmit}
+            returnKeyType="search"
             style={[styles.searchInput, { color: theme.colors.text }]}
             selectionColor={theme.colors.primary}
           />
+
+          {/* Bouton pour effacer la recherche (Visible uniquement si du texte est present) */}
+          {searchValue.length > 0 && (
+            <Pressable onPress={clearSearch} style={styles.clearButton} hitSlop={10}>
+              <X color={theme.colors.textMuted} size={18} />
+            </Pressable>
+          )}
         </View>
       </Animated.View>
       
@@ -87,17 +113,14 @@ export default function AnimatedHeader({ scrollY }) {
 const styles = StyleSheet.create({
   container: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000, overflow: 'hidden', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
-  leftSection: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  logoContainer: { position: 'absolute', left: 0 },
-  logoText: { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
-  bellContainerAnimated: { position: 'absolute', left: 0 },
-  badge: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
-  centerSection: { flex: 2, alignItems: 'center', justifyContent: 'center' },
-  miniSearchContainer: { position: 'absolute' },
-  rightSection: { flex: 1, alignItems: 'flex-end' },
+  leftSection: { flexDirection: 'row', alignItems: 'center' },
+  logoText: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  rightSection: { flexDirection: 'row', alignItems: 'center', gap: 16 }, 
   iconButton: { padding: 4 },
+  badge: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
   bottomRow: { height: 70, paddingHorizontal: 16, justifyContent: 'center', position: 'absolute', bottom: 0, left: 0, right: 0 },
   searchBar: { flexDirection: 'row', alignItems: 'center', height: 44, borderRadius: 12, paddingHorizontal: 12 },
   searchIcon: { marginRight: 8, zIndex: 2 },
-  searchInput: { flex: 1, fontSize: 15, height: '100%', zIndex: 1 },
+  searchInput: { flex: 1, fontSize: 15, height: '100%', zIndex: 1, paddingVertical: 0 },
+  clearButton: { padding: 4, marginLeft: 4, zIndex: 2 },
 });
