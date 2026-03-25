@@ -156,6 +156,6 @@ export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
   refetchOnMountOrArgChange: true,
-  tagTypes: ['User', 'Post', 'Workspace', 'Notification', 'Resource'],
+  tagTypes: ['User', 'Post', 'Workspace', 'Notification', 'Resource', 'Notification', 'NotificationCount'],
   endpoints: () => ({}),
 });

@@ -1,23 +1,66 @@
 // src/components/navigation/AnimatedHeader.jsx
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, TextInput, Pressable, DeviceEventEmitter, Text, Keyboard } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { 
+  useAnimatedProps, 
+  useAnimatedReaction, 
+  runOnJS, 
+  FadeInLeft, 
+  FadeOutRight, 
+  FadeInRight, 
+  FadeOutLeft 
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Search, Bell, Menu, X } from 'lucide-react-native';
+import { Search, Bell, Menu, X, ArrowLeft } from 'lucide-react-native';
 import { useAppTheme } from '../../theme/theme';
-import { useHeaderAnimations } from './useHeaderAnimations';
+import { useHeaderAnimations, SCROLL_DISTANCE } from './useHeaderAnimations';
 import AnimatedSearchPlaceholder from './AnimatedSearchPlaceholder';
+import { useGetUnreadCountQuery } from '../../store/api/notificationApiSlice';
+import socketService from '../../services/socketService';
 
 export default function AnimatedHeader({ scrollY }) {
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const navigation = useNavigation();
+  const compactInputRef = useRef(null);
   
   const [searchValue, setSearchValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [isCompactSearchActive, setIsCompactSearchActive] = useState(false);
 
   const animations = useHeaderAnimations(scrollY, insets);
+
+  const { data: unreadData, refetch: refetchUnread } = useGetUnreadCountQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const unreadCount = unreadData?.data?.count || 0;
+
+  // Correction de l'erreur : Ecouteur de scroll version UI Runtime
+  useAnimatedReaction(
+    () => scrollY.value,
+    (currentValue) => {
+      // Si on remonte au-dessus de la moitié de la distance, on ferme le mode compact
+      if (currentValue < SCROLL_DISTANCE / 2 && isCompactSearchActive) {
+        runOnJS(setIsCompactSearchActive)(false);
+      }
+    },
+    [isCompactSearchActive] // On garde l'état en dépendance pour la réaction
+  );
+
+  const animatedSearchProps = useAnimatedProps(() => {
+    return {
+      pointerEvents: scrollY.value > SCROLL_DISTANCE / 2 ? 'none' : 'auto',
+    };
+  });
+
+  // Focus automatique quand on ouvre la recherche compacte
+  useEffect(() => {
+    if (isCompactSearchActive) {
+      const timer = setTimeout(() => compactInputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isCompactSearchActive]);
 
   useFocusEffect(
     useCallback(() => {
@@ -28,63 +71,97 @@ export default function AnimatedHeader({ scrollY }) {
     }, [theme])
   );
 
-  const shouldHidePlaceholder = isFocused || searchValue.length > 0;
-
-  // L'action devient REELLE : Envoi du signal de recherche
   const handleSearchSubmit = () => {
-    Keyboard.dismiss(); // On libere l'ecran
+    Keyboard.dismiss();
     if (searchValue.trim().length > 0) {
       DeviceEventEmitter.emit('EXECUTE_SEARCH', { query: searchValue.trim() });
     }
+    if (isCompactSearchActive) setIsCompactSearchActive(false);
   };
 
-  // UX : Vider la recherche d'un simple clic et reset la liste
   const clearSearch = () => {
     setSearchValue('');
-    Keyboard.dismiss();
+    if (!isCompactSearchActive) {
+      Keyboard.dismiss();
+    }
     DeviceEventEmitter.emit('EXECUTE_SEARCH', { query: '' });
+  };
+
+  const closeCompactSearch = () => {
+    setIsCompactSearchActive(false);
+    Keyboard.dismiss();
   };
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: theme.colors.primary }, animations.headerHeight, theme.shadows.medium]}>
       
-      <View style={[styles.topRow, { height: 60 }]}>
-        <View style={styles.leftSection}>
-          <Text style={[styles.logoText, { color: theme.colors.surface }]}>LokoNet</Text>
-        </View>
+      {/* TOP ROW : Logo / Actions ou Barre Compacte */}
+      <View style={[styles.topRow, { height: 60, zIndex: 10 }]}>
+        
+        {!isCompactSearchActive ? (
+          <>
+            <Animated.View entering={FadeInLeft} exiting={FadeOutLeft} style={styles.leftSection}>
+              <Text style={[styles.logoText, { color: theme.colors.surface }]}>LokoNet</Text>
+            </Animated.View>
 
-        <View style={styles.rightSection}>
-          <Animated.View style={[animations.miniSearchOpacity, animations.miniSearchTranslateX]}>
-            <Pressable 
-              onPress={() => {
-                // Focus rapide sur la recherche quand on clique sur la mini-loupe
-                if (listRef?.current?.scrollToOffset) {
-                  listRef.current.scrollToOffset({ offset: 0, animated: true });
-                }
-              }} 
-              hitSlop={10} 
-              style={styles.iconButton}
-            >
-              <Search color={theme.colors.surface} size={24} />
+            <Animated.View entering={FadeInRight} exiting={FadeOutRight} style={styles.rightSection}>
+              <Animated.View style={[animations.miniSearchOpacity, animations.miniSearchTranslateX]}>
+                <Pressable 
+                  onPress={() => setIsCompactSearchActive(true)} 
+                  hitSlop={15} 
+                  style={styles.iconButton}
+                >
+                  <Search color={theme.colors.surface} size={24} />
+                </Pressable>
+              </Animated.View>
+
+              <Pressable onPress={() => navigation.navigate('Notifications')} hitSlop={10} style={styles.iconButton}>
+                <Bell color={theme.colors.surface} size={24} />
+                {unreadCount > 0 && <View style={[styles.badge, { backgroundColor: theme.colors.error, borderColor: theme.colors.primary }]} />}
+              </Pressable>
+
+              <Pressable onPress={() => navigation.navigate('Menu')} hitSlop={10} style={styles.iconButton}>
+                <Menu color={theme.colors.surface} size={28} />
+              </Pressable>
+            </Animated.View>
+          </>
+        ) : (
+          <Animated.View entering={FadeInRight} exiting={FadeOutRight} style={styles.compactSearchWrapper}>
+            <Pressable onPress={closeCompactSearch} hitSlop={15} style={styles.backButtonCompact}>
+              <ArrowLeft color={theme.colors.surface} size={24} />
             </Pressable>
+            
+            <View style={[styles.searchBarCompact, { backgroundColor: theme.colors.surface }]}>
+              <TextInput
+                ref={compactInputRef}
+                value={searchValue}
+                onChangeText={setSearchValue}
+                onSubmitEditing={handleSearchSubmit}
+                placeholder="Rechercher..."
+                placeholderTextColor={theme.colors.textDisabled}
+                returnKeyType="search"
+                style={[styles.searchInput, { color: theme.colors.text }]}
+                selectionColor={theme.colors.primary}
+              />
+              {searchValue.length > 0 && (
+                <Pressable onPress={clearSearch} hitSlop={10} style={{ padding: 5 }}>
+                  <X color={theme.colors.textMuted} size={18} />
+                </Pressable>
+              )}
+            </View>
           </Animated.View>
-
-          <Pressable onPress={() => console.log('Ouvrir les notifications')} hitSlop={10} style={styles.iconButton}>
-            <Bell color={theme.colors.surface} size={24} />
-            <View style={[styles.badge, { backgroundColor: theme.colors.error, borderColor: theme.colors.primary }]} />
-          </Pressable>
-
-          <Pressable onPress={() => navigation.navigate('Menu')} hitSlop={10} style={styles.iconButton}>
-            <Menu color={theme.colors.surface} size={28} />
-          </Pressable>
-        </View>
+        )}
       </View>
 
-      <Animated.View style={[styles.bottomRow, animations.largeSearchOpacity, animations.largeSearchTranslateY]}>
+      {/* BOTTOM ROW : Grande Barre */}
+      <Animated.View 
+        animatedProps={animatedSearchProps}
+        style={[styles.bottomRow, animations.largeSearchOpacity, animations.largeSearchTranslateY, { zIndex: 1 }]}
+      >
         <View style={[styles.searchBar, { backgroundColor: theme.colors.surface }]}>
           <Search color={theme.colors.textMuted} size={20} style={styles.searchIcon} />
           
-          <AnimatedSearchPlaceholder isHidden={shouldHidePlaceholder} />
+          <AnimatedSearchPlaceholder isHidden={isFocused || searchValue.length > 0} />
 
           <TextInput
             value={searchValue}
@@ -97,7 +174,6 @@ export default function AnimatedHeader({ scrollY }) {
             selectionColor={theme.colors.primary}
           />
 
-          {/* Bouton pour effacer la recherche (Visible uniquement si du texte est present) */}
           {searchValue.length > 0 && (
             <Pressable onPress={clearSearch} style={styles.clearButton} hitSlop={10}>
               <X color={theme.colors.textMuted} size={18} />
@@ -117,7 +193,10 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   rightSection: { flexDirection: 'row', alignItems: 'center', gap: 16 }, 
   iconButton: { padding: 4 },
-  badge: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
+  badge: { position: 'absolute', top: 4, right: 4, width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
+  compactSearchWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  backButtonCompact: { marginRight: 12 },
+  searchBarCompact: { flex: 1, height: 40, borderRadius: 20, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15 },
   bottomRow: { height: 70, paddingHorizontal: 16, justifyContent: 'center', position: 'absolute', bottom: 0, left: 0, right: 0 },
   searchBar: { flexDirection: 'row', alignItems: 'center', height: 44, borderRadius: 12, paddingHorizontal: 12 },
   searchIcon: { marginRight: 8, zIndex: 2 },

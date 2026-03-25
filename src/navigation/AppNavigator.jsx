@@ -6,7 +6,7 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getToken } from '../store/secureStoreAdapter';
 
-// Importation des nouvelles actions securisees de la Vague 1
+// Importation des actions sécurisées
 import { restoreAuth, forceSilentRefresh, setAuthLoading } from '../store/slices/authSlice';
 import { useAppTheme } from '../theme/theme';
 
@@ -16,6 +16,7 @@ import RegisterPage from '../screens/auth/RegisterPage';
 import MainTabNavigator from './MainTabNavigator';
 import MenuScreen from '../screens/profile/MenuScreen';
 import MyResourcesScreen from '../screens/profile/MyResourcesScreen';
+import NotificationsScreen from '../screens/notifications/NotificationsScreen'; 
 import ErrorToast from '../components/ui/ErrorToast';
 import SuccessToast from '../components/ui/SuccessToast';
 import TopInsetBox from '../components/ui/TopInsetBox';
@@ -68,17 +69,13 @@ export default function AppNavigator() {
             console.error('[Boot] Erreur de parsing userData', parseError);
           }
           
-          // 1. Restauration silencieuse en memoire pure
           dispatch(restoreAuth({ 
             user: savedUser, 
             token, 
             refreshToken
           }));
 
-          // 2. Reconnexion immediate du socket pour la reactivite temps reel
           socketService.connect(token);
-
-          // 3. Declenchement de la synchronisation silencieuse du token en arriere-plan
           dispatch(forceSilentRefresh());
 
         } else {
@@ -129,6 +126,7 @@ export default function AppNavigator() {
           ) : (
             <>
               <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+              
               <Stack.Screen
                 name="Menu"
                 component={MenuScreen}
@@ -142,7 +140,23 @@ export default function AppNavigator() {
                   cardStyleInterpolator: immersiveFadeInterpolator,
                 }}
               />
+              
               <Stack.Screen name="MyResources" component={MyResourcesScreen} />
+              
+              {/* NOTIFICATIONS AVEC FADE-IN IMMERSIF */}
+              <Stack.Screen 
+                name="Notifications" 
+                component={NotificationsScreen} 
+                options={{
+                  gestureEnabled: true,
+                  cardStyle: { backgroundColor: theme.colors.background },
+                  transitionSpec: {
+                    open: fadeTimingConfig,
+                    close: fadeTimingConfig,
+                  },
+                  cardStyleInterpolator: immersiveFadeInterpolator,
+                }}
+              />
             </>
           )}
         </Stack.Navigator>
