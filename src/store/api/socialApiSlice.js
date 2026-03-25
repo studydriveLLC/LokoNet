@@ -1,10 +1,11 @@
+//src/store/api/socialApiSlice.js
 import { apiSlice } from '../slices/apiSlice';
 
 export const socialApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getFollowStatus: builder.query({
       query: (targetId) => `/v1/social/status/${targetId}`,
-      providesTags: (result, error, arg) => [{ type: 'FollowStatus', id: arg }],
+      providesTags: (result, error, arg) => [{ type: 'FollowStatus', id: String(arg) }],
     }),
     
     getMyFollowStats: builder.query({
@@ -17,9 +18,14 @@ export const socialApiSlice = apiSlice.injectEndpoints({
         url: `/v1/social/follow/${targetId}`,
         method: 'POST',
       }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'FollowStatus', id: String(arg) },
+        'FollowStats'
+      ],
       async onQueryStarted(targetId, { dispatch, queryFulfilled }) {
+        const stringId = String(targetId);
         const patchStatus = dispatch(
-          socialApiSlice.util.updateQueryData('getFollowStatus', targetId, (draft) => {
+          socialApiSlice.util.updateQueryData('getFollowStatus', stringId, (draft) => {
             if (draft) {
               if (draft.data !== undefined) draft.data.isFollowing = true;
               else draft.isFollowing = true;
@@ -52,9 +58,14 @@ export const socialApiSlice = apiSlice.injectEndpoints({
         url: `/v1/social/unfollow/${targetId}`,
         method: 'POST',
       }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'FollowStatus', id: String(arg) },
+        'FollowStats'
+      ],
       async onQueryStarted(targetId, { dispatch, queryFulfilled }) {
+        const stringId = String(targetId);
         const patchStatus = dispatch(
-          socialApiSlice.util.updateQueryData('getFollowStatus', targetId, (draft) => {
+          socialApiSlice.util.updateQueryData('getFollowStatus', stringId, (draft) => {
             if (draft) {
               if (draft.data !== undefined) draft.data.isFollowing = false;
               else draft.isFollowing = false;

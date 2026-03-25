@@ -1,3 +1,4 @@
+//src/store/api/notificationApiSlice.js
 import { apiSlice } from '../slices/apiSlice';
 import socketService from '../../services/socketService';
 
@@ -11,7 +12,7 @@ export const notificationApiSlice = apiSlice.injectEndpoints({
         const notifs = result?.data?.notifications || result?.notifications;
         return notifs
           ? [
-              ...notifs.map(({ _id }) => ({ type: 'Notification', id: _id })),
+              ...notifs.map(({ _id }) => ({ type: 'Notification', id: String(_id) })),
               { type: 'Notification', id: 'LIST' }
             ]
           : [{ type: 'Notification', id: 'LIST' }];
@@ -21,12 +22,22 @@ export const notificationApiSlice = apiSlice.injectEndpoints({
     getUnreadCount: builder.query({
       query: () => ({ url: '/v1/notifications/unread-count' }),
       providesTags: ['NotificationCount'],
-      async onCacheEntryAdded(arg, { dispatch, cacheDataLoaded, cacheEntryRemoved }) {
+      async onCacheEntryAdded(arg, { dispatch, updateCachedData, cacheDataLoaded, cacheEntryRemoved }) {
         try {
           await cacheDataLoaded.catch(() => {}); 
           
           const handleNewNotification = () => {
-            dispatch(notificationApiSlice.util.invalidateTags(['NotificationCount']));
+            updateCachedData((draft) => {
+              if (draft?.data !== undefined && typeof draft.data.count === 'number') {
+                draft.data.count += 1;
+              } else if (typeof draft?.count === 'number') {
+                draft.count += 1;
+              } else if (draft) {
+                draft.count = 1;
+              }
+            });
+            
+            dispatch(notificationApiSlice.util.invalidateTags([{ type: 'Notification', id: 'LIST' }]));
           };
 
           if (socketService && typeof socketService.on === 'function') {
@@ -50,11 +61,12 @@ export const notificationApiSlice = apiSlice.injectEndpoints({
         method: 'PATCH',
       }),
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const stringId = String(id);
         const patchResult = dispatch(
           notificationApiSlice.util.updateQueryData('getNotifications', { page: 1, limit: 50 }, (draft) => {
             const notifs = draft?.data?.notifications || draft?.notifications;
             if (notifs) {
-              const notif = notifs.find(n => String(n._id) === String(id));
+              const notif = notifs.find(n => String(n._id) === stringId);
               if (notif) notif.isRead = true;
             }
           })
@@ -82,11 +94,20 @@ export const notificationApiSlice = apiSlice.injectEndpoints({
             }
           })
         );
+        
+        const patchCount = dispatch(
+          notificationApiSlice.util.updateQueryData('getUnreadCount', undefined, (draft) => {
+            if (draft?.data !== undefined) draft.data.count = 0;
+            else if (draft) draft.count = 0;
+          })
+        );
+
         try {
           await queryFulfilled;
           dispatch(notificationApiSlice.util.invalidateTags(['NotificationCount']));
         } catch {
           patchResult.undo();
+          patchCount.undo();
         }
       }
     }),
@@ -97,12 +118,13 @@ export const notificationApiSlice = apiSlice.injectEndpoints({
         method: 'DELETE',
       }),
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const stringId = String(id);
         const patchResult = dispatch(
           notificationApiSlice.util.updateQueryData('getNotifications', { page: 1, limit: 50 }, (draft) => {
             if (draft?.data?.notifications) {
-              draft.data.notifications = draft.data.notifications.filter(n => String(n._id) !== String(id));
+              draft.data.notifications = draft.data.notifications.filter(n => String(n._id) !== stringId);
             } else if (draft?.notifications) {
-              draft.notifications = draft.notifications.filter(n => String(n._id) !== String(id));
+              draft.notifications = draft.notifications.filter(n => String(n._id) !== stringId);
             }
           })
         );
@@ -122,12 +144,13 @@ export const notificationApiSlice = apiSlice.injectEndpoints({
         body: { notificationIds },
       }),
       async onQueryStarted(notificationIds, { dispatch, queryFulfilled }) {
+        const stringIds = notificationIds.map(id => String(id));
         const patchResult = dispatch(
           notificationApiSlice.util.updateQueryData('getNotifications', { page: 1, limit: 50 }, (draft) => {
             if (draft?.data?.notifications) {
-              draft.data.notifications = draft.data.notifications.filter(n => !notificationIds.includes(n._id));
+              draft.data.notifications = draft.data.notifications.filter(n => !stringIds.includes(String(n._id)));
             } else if (draft?.notifications) {
-              draft.notifications = draft.notifications.filter(n => !notificationIds.includes(n._id));
+              draft.notifications = draft.notifications.filter(n => !stringIds.includes(String(n._id)));
             }
           })
         );
@@ -155,11 +178,20 @@ export const notificationApiSlice = apiSlice.injectEndpoints({
             }
           })
         );
+        
+        const patchCount = dispatch(
+          notificationApiSlice.util.updateQueryData('getUnreadCount', undefined, (draft) => {
+            if (draft?.data !== undefined) draft.data.count = 0;
+            else if (draft) draft.count = 0;
+          })
+        );
+
         try {
           await queryFulfilled;
           dispatch(notificationApiSlice.util.invalidateTags(['NotificationCount']));
         } catch {
           patchResult.undo();
+          patchCount.undo();
         }
       }
     }),
