@@ -1,9 +1,10 @@
+// src/components/profile/LogoutModal.jsx
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { LogOut } from 'lucide-react-native';
 import { useAppTheme } from '../../theme/theme';
 
-export default function LogoutModal({ visible, onClose, onConfirm }) {
+export default function LogoutModal({ visible, onClose, onConfirm, isLoading }) {
   const theme = useAppTheme();
 
   return (
@@ -11,11 +12,14 @@ export default function LogoutModal({ visible, onClose, onConfirm }) {
       transparent={true} 
       visible={visible} 
       animationType="fade" 
-      onRequestClose={onClose}
+      onRequestClose={isLoading ? null : onClose}
     >
       <View style={styles.overlay}>
-        {/* Le fond cliquable pour annuler */}
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        {/* Le fond cliquable pour annuler (désactivé pendant le chargement) */}
+        <Pressable 
+          style={styles.backdrop} 
+          onPress={isLoading ? null : onClose} 
+        />
         
         {/* La boîte de dialogue */}
         <View style={[styles.modalBox, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -24,27 +28,38 @@ export default function LogoutModal({ visible, onClose, onConfirm }) {
             <LogOut color={theme.colors.error} size={32} />
           </View>
           
-          <Text style={[styles.title, { color: theme.colors.text }]}>Déconnexion</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Deconnexion</Text>
           <Text style={[styles.message, { color: theme.colors.textMuted }]}>
-            Êtes-vous sûr de vouloir vous déconnecter ? Vous devrez saisir à nouveau vos identifiants pour accéder à vos ressources.
+            Etes-vous sur de vouloir vous deconnecter ? Vous devrez saisir a nouveau vos identifiants pour acceder a vos ressources.
           </Text>
 
           <View style={styles.buttonContainer}>
             <Pressable 
-              style={[styles.cancelBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]} 
+              style={[
+                styles.cancelBtn, 
+                { backgroundColor: theme.colors.background, borderColor: theme.colors.border },
+                isLoading && { opacity: 0.5 }
+              ]} 
               onPress={onClose}
+              disabled={isLoading}
             >
               <Text style={[styles.cancelText, { color: theme.colors.text }]}>Annuler</Text>
             </Pressable>
             
             <Pressable 
-              style={[styles.confirmBtn, { backgroundColor: theme.colors.error }]} 
-              onPress={() => {
-                onClose();
-                onConfirm();
-              }}
+              style={[
+                styles.confirmBtn, 
+                { backgroundColor: theme.colors.error },
+                isLoading && { opacity: 0.8 }
+              ]} 
+              onPress={onConfirm}
+              disabled={isLoading}
             >
-              <Text style={[styles.confirmText, { color: theme.colors.surface }]}>Me déconnecter</Text>
+              {isLoading ? (
+                <ActivityIndicator color={theme.colors.surface} size="small" />
+              ) : (
+                <Text style={[styles.confirmText, { color: theme.colors.surface }]}>Me deconnecter</Text>
+              )}
             </Pressable>
           </View>
         </View>

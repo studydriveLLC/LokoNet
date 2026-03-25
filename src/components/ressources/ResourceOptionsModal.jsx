@@ -1,5 +1,6 @@
+// src/components/ressources/ResourceOptionsModal.jsx
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Share2, AlertTriangle, Trash2, Bookmark, Edit2 } from 'lucide-react-native';
 import BottomSheet from '../ui/BottomSheet';
 import { useAppTheme } from '../../theme/theme';
@@ -14,15 +15,25 @@ export default function ResourceOptionsModal({
   onDelete,
   onReport,
   onEdit,
+  // NOUVEAUX PROPS UX : États de chargement spécifiques par action
+  isSaving,
+  isDeleting,
+  isReporting
 }) {
   const theme = useAppTheme();
   
   if (!resource) return null;
 
-  const renderOption = (icon, label, onPress, isDestructive = false) => (
+  // Fonction utilitaire enrichie pour gérer l'état de chargement
+  const renderOption = (icon, label, onPress, isDestructive = false, isLoading = false) => (
     <Pressable
-      style={[styles.optionRow, { borderBottomColor: theme.colors.divider }]}
+      style={[
+        styles.optionRow, 
+        { borderBottomColor: theme.colors.divider },
+        isLoading && { opacity: 0.5 }
+      ]}
       onPress={onPress}
+      disabled={isLoading}
     >
       <View
         style={[
@@ -30,7 +41,11 @@ export default function ResourceOptionsModal({
           { backgroundColor: isDestructive ? 'rgba(235, 87, 87, 0.1)' : theme.colors.primaryLight },
         ]}
       >
-        {icon}
+        {isLoading ? (
+          <ActivityIndicator color={isDestructive ? theme.colors.error : theme.colors.primaryDark} size="small" />
+        ) : (
+          icon
+        )}
       </View>
       <Text
         style={[
@@ -38,7 +53,7 @@ export default function ResourceOptionsModal({
           { color: isDestructive ? theme.colors.error : theme.colors.text },
         ]}
       >
-        {label}
+        {isLoading ? 'Traitement en cours...' : label}
       </Text>
     </Pressable>
   );
@@ -63,10 +78,14 @@ export default function ResourceOptionsModal({
           'Partager la ressource',
           onShare
         )}
+        
+        {/* Intégration du loader d'ajout aux favoris */}
         {renderOption(
           <Bookmark color={theme.colors.primaryDark} size={20} />,
           'Ajouter / Retirer des favoris',
-          onSave
+          onSave,
+          false,
+          isSaving
         )}
 
         {isMyResource ? (
@@ -76,19 +95,23 @@ export default function ResourceOptionsModal({
               'Modifier le fichier',
               onEdit
             )}
+            {/* Anticipation : Loader pour la suppression */}
             {renderOption(
               <Trash2 color={theme.colors.error} size={20} />,
               'Supprimer le fichier',
               onDelete,
-              true
+              true,
+              isDeleting
             )}
           </>
         ) : (
+          /* Anticipation : Loader pour le signalement */
           renderOption(
             <AlertTriangle color={theme.colors.error} size={20} />,
             'Signaler ce document',
             onReport,
-            true
+            true,
+            isReporting
           )
         )}
       </View>

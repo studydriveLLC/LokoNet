@@ -1,3 +1,4 @@
+// src/screens/ressources/RessourcesScreen.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, DeviceEventEmitter, RefreshControl, Platform, AppState, ActivityIndicator } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
@@ -61,7 +62,9 @@ export default function RessourcesScreen({ navigation }) {
   const [logDownload] = useLogDownloadMutation();
   const [logView] = useLogViewMutation();
   const [deleteResource, { isLoading: isDeleting }] = useDeleteResourceMutation();
-  const [toggleFavorite] = useToggleFavoriteMutation();
+  
+  // CORRECTION : Extraction de l'état isLoading pour les favoris
+  const [toggleFavorite, { isLoading: isTogglingFavorite }] = useToggleFavoriteMutation();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -273,20 +276,22 @@ export default function RessourcesScreen({ navigation }) {
         resource={activeOptionsResource}
         onClose={() => setActiveOptionsResource(null)}
         isMyResource={activeOptionsResource?.uploadedBy?._id === currentUserId}
+        isSaving={isTogglingFavorite} // CONNEXION DU LOADER ICI
         onShare={async () => {
           const url = activeOptionsResource.fileUrl || activeOptionsResource.url;
           if (url && await Sharing.isAvailableAsync()) await Sharing.shareAsync(url);
           setActiveOptionsResource(null);
         }}
         
-        // LA LOGIQUE FAVORIS AVEC TOAST VISUEL
         onSave={async () => {
           try { 
+            // Le modal restera ouvert pendant le "await" grace a l'etat isTogglingFavorite
             const result = await toggleFavorite(activeOptionsResource._id).unwrap();
             dispatch(showSuccessToast({ message: result.message }));
           } catch (e) {
             console.log('Erreur favoris:', e);
           }
+          // On ferme la modale seulement une fois la requete terminee
           setActiveOptionsResource(null);
         }}
 

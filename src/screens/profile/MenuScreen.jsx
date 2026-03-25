@@ -11,7 +11,6 @@ import LogoutModal from '../../components/profile/LogoutModal';
 import { useAppTheme } from '../../theme/theme';
 
 import { useUpdateProfileMutation, useLogoutMutation } from '../../store/api/authApiSlice';
-// CORRECTION : On importe uniquement ce dont on a besoin. performLogout remplace logout.
 import { updateUser, performLogout } from '../../store/slices/authSlice';
 import socketService from '../../services/socketService';
 
@@ -26,17 +25,15 @@ export default function MenuScreen({ navigation }) {
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
 
   const [updateProfileApi, { isLoading: isUpdating }] = useUpdateProfileMutation();
-  const [logoutApi] = useLogoutMutation();
+  
+  // CORRECTION : Extraction de l'état isLoading pour la déconnexion
+  const [logoutApi, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const handleUpdateProfile = async (updatedData) => {
     try {
       const response = await updateProfileApi(updatedData).unwrap();
       const newUserData = response.data?.user || updatedData;
-      
-      // La mise a jour du Redux declenchera automatiquement la sauvegarde dans SecureStore 
-      // via la logique que nous avons mise en place dans authSlice.js
       dispatch(updateUser(newUserData));
-      
       setIsEditModalVisible(false);
     } catch (error) {
       console.error("Erreur lors de la mise a jour du profil :", error);
@@ -45,17 +42,12 @@ export default function MenuScreen({ navigation }) {
 
   const handleConfirmLogout = async () => {
     try {
-      // On previent le serveur si possible
       await logoutApi().unwrap();
     } catch (error) {
       console.log("Deconnexion serveur echouee, forcage local.", error);
     } finally {
-      // 1. On coupe le Socket proprement
       socketService.disconnect();
-      
-      // 2. LA SUPER DECONNEXION : Purge le Redux, le cache RTK Query et le SecureStore d'un seul coup
       dispatch(performLogout());
-      
       setIsLogoutModalVisible(false);
     }
   };
@@ -134,6 +126,7 @@ export default function MenuScreen({ navigation }) {
         visible={isLogoutModalVisible}
         onClose={() => setIsLogoutModalVisible(false)}
         onConfirm={handleConfirmLogout}
+        isLoading={isLoggingOut} // CONNEXION DU LOADER ICI
       />
     </View>
   );
