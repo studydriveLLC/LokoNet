@@ -1,4 +1,4 @@
-// src/components/ui/SmartRefreshOverlay.jsx
+//src/components/ui/SmartRefreshOverlay.jsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -9,19 +9,16 @@ export default function SmartRefreshOverlay({ isVisible }) {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [dots, setDots] = useState('');
   
-  // Etat pour savoir si le composant doit physiquement exister
   const [isRendered, setIsRendered] = useState(isVisible);
 
   useEffect(() => {
     let interval;
     if (isVisible) {
-      // 1. On s'assure que le composant est dans l'ecran
       setIsRendered(true);
       
-      // 2. On lance l'animation d'apparition
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 250,
+        duration: 300, 
         useNativeDriver: true,
       }).start();
 
@@ -29,13 +26,11 @@ export default function SmartRefreshOverlay({ isVisible }) {
         setDots(prev => (prev.length >= 3 ? '' : prev + '.'));
       }, 350);
     } else {
-      // 1. On lance l'animation de disparition
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start(({ finished }) => {
-        // 2. SEULEMENT quand l'animation est finie, on detruit physiquement le composant
         if (finished) {
           setIsRendered(false);
         }
@@ -46,26 +41,39 @@ export default function SmartRefreshOverlay({ isVisible }) {
     return () => clearInterval(interval);
   }, [isVisible, fadeAnim]);
 
-  // Si le composant ne doit pas etre rendu, on renvoie null brutalement.
   if (!isRendered) {
     return null;
   }
 
+  const isDarkMode = theme.colors.background === '#0F1113';
+  
+  // 'default' offre souvent le meilleur compromis de réfraction sur Android
+  const blurTint = isDarkMode ? 'dark' : 'default';
+
   return (
     <Animated.View 
-      style={[styles.container, { opacity: fadeAnim }]}
+      style={[
+        styles.container, 
+        { 
+          opacity: fadeAnim,
+          // Le secret du flou Facebook : une légère teinte de fond pour lisser le bruit
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.2)'
+        }
+      ]}
       pointerEvents="auto" 
     >
       <BlurView
         style={StyleSheet.absoluteFill}
-        tint={theme.dark ? "dark" : "light"}
-        intensity={90} // CORRECTION : Intensite passee de 40 a 90 pour un blur tres accentue
+        tint={blurTint}
+        intensity={90} // Un chouïa moins pour éviter les lags sur certains Android, tout en restant profond
       />
 
       <View style={styles.content}>
-        <Text style={[styles.text, { color: theme.colors.primary }]}>
-          Actualisation{dots}
-        </Text>
+        <View style={styles.loaderCard}>
+          <Text style={[styles.text, { color: theme.colors.primary }]}>
+            Actualisation{dots}
+          </Text>
+        </View>
       </View>
     </Animated.View>
   );
@@ -81,12 +89,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loaderCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 15,
+    // Un léger fond pour faire ressortir le texte du flou
+    backgroundColor: 'rgba(255, 255, 255, 0.08)', 
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+  },
   text: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   }
 });
