@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { useSelector } from 'react-redux';
 import { useRegisterPushTokenMutation } from '../store/api/notificationApiSlice';
 
@@ -14,6 +15,12 @@ export const usePushNotifications = () => {
 
     const registerForPushNotificationsAsync = async () => {
       try {
+        // PROTECTION ARCHITECTURE : Bypass si on est dans Expo Go (SDK 53+)
+        if (Constants.appOwnership === 'expo') {
+          console.log('[Push] Mode Expo Go detecte. Generation du token FCM ignoree pour eviter le crash.');
+          return;
+        }
+
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
             name: 'default',
@@ -36,7 +43,6 @@ export const usePushNotifications = () => {
           return;
         }
 
-        // C'est ici qu'on recupere le vrai token FCM/APNs et non le token des serveurs d'Expo
         const tokenData = await Notifications.getDevicePushTokenAsync();
         const token = tokenData.data;
 

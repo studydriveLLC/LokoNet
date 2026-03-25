@@ -1,3 +1,4 @@
+//src/navigation/MainTabNavigator.jsx
 import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, DeviceEventEmitter } from 'react-native';
@@ -26,7 +27,6 @@ export default function MainTabNavigator() {
   const [isResourceModalVisible, setIsResourceModalVisible] = useState(false);
 
   useEffect(() => {
-    // Le cerveau central qui redirige l'action selon la page active
     const subscription = DeviceEventEmitter.addListener('SMART_ACTION_PRESS', ({ routeName }) => {
       if (routeName === 'PourToi') {
         setIsPostModalVisible(true);
@@ -44,7 +44,22 @@ export default function MainTabNavigator() {
 
   return (
     <>
-      <Tab.Navigator tabBar={(props) => <AnimatedTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tab.Navigator 
+        tabBar={(props) => <AnimatedTabBar {...props} />} 
+        screenOptions={{ headerShown: false }}
+        // INTERCEPTION UX NIVEAU 8 : Écoute globale des clics sur les onglets
+        screenListeners={({ navigation, route }) => ({
+          tabPress: (e) => {
+            const state = navigation.getState();
+            const activeRouteName = state.routes[state.index].name;
+            
+            // Si on clique sur l'onglet sur lequel on se trouve déjà
+            if (route.name === activeRouteName) {
+              DeviceEventEmitter.emit('SMART_TAB_PRESS', { routeName: route.name });
+            }
+          },
+        })}
+      >
         <Tab.Screen name="Ressources" component={RessourcesScreen} />
         <Tab.Screen name="PourToi" component={FeedScreen} />
         <Tab.Screen name="Action" component={EmptyActionScreen} />
@@ -52,7 +67,6 @@ export default function MainTabNavigator() {
         <Tab.Screen name="MyWord" component={PlaceholderScreen} />
       </Tab.Navigator>
 
-      {/* Les cockpits de création injectés globalement */}
       <CreatePostModal visible={isPostModalVisible} onClose={() => setIsPostModalVisible(false)} />
       <UploadResourceModal visible={isResourceModalVisible} onClose={() => setIsResourceModalVisible(false)} />
     </>

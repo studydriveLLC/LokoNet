@@ -78,7 +78,6 @@ export default function RessourcesScreen({ navigation }) {
     return () => subscription.remove();
   }, []);
 
-  // ECOUTEUR DE RECHERCHE GLOBALE : Met a jour l'appel API automatiquement
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('EXECUTE_SEARCH', ({ query }) => {
       setQueryArgs(prev => {
@@ -86,11 +85,10 @@ export default function RessourcesScreen({ navigation }) {
         if (query) {
           newArgs.search = query;
         } else {
-          delete newArgs.search; // Si on annule, on supprime le filtre
+          delete newArgs.search;
         }
         return newArgs;
       });
-      // Optionnel : remonter la liste quand on cherche
       if (listRef.current?.scrollToOffset) {
         listRef.current.scrollToOffset({ offset: 0, animated: true });
       }
@@ -98,7 +96,7 @@ export default function RessourcesScreen({ navigation }) {
     return () => subscription.remove();
   }, []);
 
-  // LE CŒUR DE L'UX NIVEAU 8
+  // LE CŒUR DE L'UX NIVEAU 8 - CORRIGÉ
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('SMART_TAB_PRESS', (event) => {
       if (event.routeName !== 'Ressources' || isFetchingRef.current) return;
@@ -106,18 +104,21 @@ export default function RessourcesScreen({ navigation }) {
       isFetchingRef.current = true;
       setIsSmartRefreshing(true); 
 
-      requestAnimationFrame(() => {
+      // 1. On donne 150ms à l'overlay pour s'afficher complètement et masquer l'écran
+      setTimeout(() => {
         try {
+          // 2. animated: true force le moteur natif à exécuter le scroll sans faille
           if (listRef.current?.scrollToOffset) {
             listRef.current.scrollToOffset({ offset: 0, animated: true });
-          } else if (listRef.current?.scrollTo) {
-            listRef.current.scrollTo({ y: 0, animated: true });
           } else if (listRef.current?.getNode?.()?.scrollToOffset) {
             listRef.current.getNode().scrollToOffset({ offset: 0, animated: true });
           }
-        } catch (error) {}
-      });
+        } catch (error) {
+          console.log("Erreur de scroll silencieuse:", error);
+        }
+      }, 150);
       
+      // 3. On retire l'overlay après 800ms (le scroll prend ~300ms en arrière-plan)
       setTimeout(() => {
         setIsSmartRefreshing(false); 
         isFetchingRef.current = false;
@@ -181,8 +182,8 @@ export default function RessourcesScreen({ navigation }) {
           keyExtractor={(item) => item.toString()}
           contentContainerStyle={{ paddingTop: 140 + insets.top, paddingBottom: 100 }}
           renderItem={() => <SkeletonResourceCard />}
-          keyboardShouldPersistTaps="handled" // Permet de fermer le clavier au clic sur la liste
-          keyboardDismissMode="on-drag" // Ferme le clavier automatiquement au scroll
+          keyboardShouldPersistTaps="handled" 
+          keyboardDismissMode="on-drag" 
         />
       ) : (
         <Animated.FlatList
@@ -192,8 +193,8 @@ export default function RessourcesScreen({ navigation }) {
           onScroll={scrollHandler}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled" // ICI : C'est ce qui ferme le clavier si on touche "n'importe ou ailleurs"
-          keyboardDismissMode="on-drag" // ICI : C'est ce qui ferme le clavier si on scrolle
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag" 
           contentContainerStyle={{ paddingTop: 140 + insets.top, paddingBottom: 100 }}
           renderItem={({ item }) => (
             <ResourceCard
