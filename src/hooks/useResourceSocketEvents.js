@@ -1,4 +1,5 @@
 // src/hooks/useResourceSocketEvents.js
+
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import socketService from '../services/socketService';
@@ -19,6 +20,7 @@ export default function useResourceSocketEvents(queryArgsRef) {
             if (resource) {
               if (data.views !== undefined) resource.views = data.views;
               if (data.downloads !== undefined) resource.downloads = data.downloads;
+              if (data.shares !== undefined) resource.shares = data.shares;
             }
           }));
           dispatch(resourceApiSlice.util.invalidateTags([{ type: 'Resource', id: data.id }]));

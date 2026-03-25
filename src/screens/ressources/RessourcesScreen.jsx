@@ -21,10 +21,9 @@ import { showSuccessToast } from '../../store/slices/uiSlice';
 import { 
   useGetResourcesQuery, useDeleteResourceMutation, 
   useLogDownloadMutation, useLogViewMutation, useGetResourceQuery, 
-  useToggleFavoriteMutation 
+  useToggleFavoriteMutation, useLogShareMutation 
 } from '../../store/api/resourceApiSlice';
 
-// IMPORT DES CUSTOM HOOKS
 import useResourceSocketEvents from '../../hooks/useResourceSocketEvents';
 import useResourceFileManager from '../../hooks/useResourceFileManager';
 
@@ -56,10 +55,10 @@ export default function RessourcesScreen({ navigation }) {
   
   const [logDownload] = useLogDownloadMutation();
   const [logView] = useLogViewMutation();
+  const [logShare] = useLogShareMutation();
   const [deleteResource, { isLoading: isDeleting }] = useDeleteResourceMutation();
   const [toggleFavorite, { isLoading: isTogglingFavorite }] = useToggleFavoriteMutation();
 
-  // CUSTOM HOOKS
   useResourceSocketEvents(queryArgsRef);
   const { downloads, activeDocument, setActiveDocument, activeViewId, handleViewAction, handleDownloadAction } = useResourceFileManager(token, theme, logView, logDownload);
 
@@ -109,20 +108,31 @@ export default function RessourcesScreen({ navigation }) {
     }
   };
 
-  const handleShareResource = async () => {
-    if (!activeOptionsResource) return;
-    let fileUrl = activeOptionsResource.fileUrl || activeOptionsResource.url || activeOptionsResource.tempFilePath;
+  const handleShare = async (resource) => {
+    if (!resource) return;
+    
+    let fileUrl = resource.fileUrl || resource.url || resource.tempFilePath;
     if (fileUrl && !fileUrl.startsWith('http')) {
       const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000';
       fileUrl = `${rawBaseUrl.replace(/\/$/, '')}/${fileUrl.replace(/^\//, '')}`;
     }
+    
     try {
-      await Share.share({
-        message: `📚 Document LokoNet : *${activeOptionsResource.title}*\nNiveau : ${activeOptionsResource.level || 'Non spécifié'}\n\nLien : ${fileUrl}`,
-        title: activeOptionsResource.title,
+      const result = await Share.share({
+        message: `Document LokoNet : *${resource.title}*\nNiveau : ${resource.level || 'Non specifie'}\n\nLien : ${fileUrl}`,
+        title: resource.title,
       });
-    } catch (error) {} 
-    finally { setActiveOptionsResource(null); }
+
+      if (result.action === Share.sharedAction) {
+        await logShare(resource._id).unwrap();
+      }
+    } catch (error) {
+      console.log('Erreur lors du partage:', error);
+    } finally {
+      if (activeOptionsResource && activeOptionsResource._id === resource._id) {
+        setActiveOptionsResource(null);
+      }
+    }
   };
 
   return (
@@ -153,6 +163,7 @@ export default function RessourcesScreen({ navigation }) {
               onView={handleViewAction}
               onDownloadAction={handleDownloadAction}
               onOptions={setActiveOptionsResource}
+              onShare={handleShare}
             />
           )}
           ListEmptyComponent={() => (
@@ -175,7 +186,7 @@ export default function RessourcesScreen({ navigation }) {
         onClose={() => setActiveOptionsResource(null)}
         isMyResource={activeOptionsResource?.uploadedBy?._id === currentUserId}
         isSaving={isTogglingFavorite}
-        onShare={handleShareResource}
+        onShare={() => handleShare(activeOptionsResource)}
         onSave={async () => {
           try { 
             const result = await toggleFavorite(activeOptionsResource._id).unwrap();
@@ -201,7 +212,6 @@ export default function RessourcesScreen({ navigation }) {
       <ReportResourceModal visible={!!reportingResource} resource={reportingResource} onClose={() => setReportingResource(null)} />
       <DocumentViewerModal visible={!!activeDocument} onClose={() => setActiveDocument(null)} resource={activeDocument} token={token} />
       
-      {/* MODALE DE SUPPRESSION EXTRAITE */}
       <DeleteResourceModal 
         visible={!!resourceToDelete} 
         onClose={() => setResourceToDelete(null)} 

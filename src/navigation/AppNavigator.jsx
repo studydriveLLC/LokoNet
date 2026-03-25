@@ -1,11 +1,13 @@
-// src/navigation/AppNavigator.jsx
+//src/navigation/AppNavigator.jsx
 import React, { useEffect } from 'react';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { useSelector, useDispatch } from 'react-redux';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getToken } from '../store/secureStoreAdapter';
-import { setCredentials, setAuthLoading } from '../store/slices/authSlice';
+
+// Importation des nouvelles actions securisees de la Vague 1
+import { restoreAuth, forceSilentRefresh, setAuthLoading } from '../store/slices/authSlice';
 import { useAppTheme } from '../theme/theme';
 
 import LandingPage from '../screens/auth/LandingPage';
@@ -13,13 +15,12 @@ import LoginPage from '../screens/auth/LoginPage';
 import RegisterPage from '../screens/auth/RegisterPage';
 import MainTabNavigator from './MainTabNavigator';
 import MenuScreen from '../screens/profile/MenuScreen';
-import MyResourcesScreen from '../screens/profile/MyResourcesScreen'; // NOUVEL IMPORT
+import MyResourcesScreen from '../screens/profile/MyResourcesScreen';
 import ErrorToast from '../components/ui/ErrorToast';
 import SuccessToast from '../components/ui/SuccessToast';
 import TopInsetBox from '../components/ui/TopInsetBox';
 import TokenGuardian from '../components/auth/TokenGuardian';
 
-// IMPORT DE NOTRE NOUVEAU SOCKET
 import socketService from '../services/socketService';
 
 const Stack = createStackNavigator();
@@ -53,36 +54,45 @@ export default function AppNavigator() {
   const { isAuthenticated, isLoading } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    const checkToken = async () => {
+    const bootSequence = async () => {
       try {
         const token = await getToken('accessToken');
         const userDataStr = await getToken('userData');
         const refreshToken = await getToken('refreshToken');
 
         if (token && userDataStr) {
-          const savedUser = JSON.parse(userDataStr);
+          let savedUser = null;
+          try {
+            savedUser = JSON.parse(userDataStr);
+          } catch (parseError) {
+            console.error('[Boot] Erreur de parsing userData', parseError);
+          }
           
-          dispatch(setCredentials({ 
+          // 1. Restauration silencieuse en memoire pure
+          dispatch(restoreAuth({ 
             user: savedUser, 
             token, 
             refreshToken
           }));
 
-          // TRICHE YELY : On connecte le socket immediatement, de maniere synchrone, avec un token valide garanti.
+          // 2. Reconnexion immediate du socket pour la reactivite temps reel
           socketService.connect(token);
 
+          // 3. Declenchement de la synchronisation silencieuse du token en arriere-plan
+          dispatch(forceSilentRefresh());
+
         } else {
-          dispatch(setCredentials({ user: null, token: null, refreshToken: null }));
+          dispatch(restoreAuth({ user: null, token: null, refreshToken: null }));
         }
       } catch (error) {
-        console.error('Erreur lecture SecureStore', error);
-        dispatch(setCredentials({ user: null, token: null, refreshToken: null }));
+        console.error('[Boot] Erreur critique SecureStore', error);
+        dispatch(restoreAuth({ user: null, token: null, refreshToken: null }));
       } finally {
         dispatch(setAuthLoading(false));
       }
     };
     
-    checkToken();
+    bootSequence();
   }, [dispatch]);
 
   if (isLoading) {
@@ -132,7 +142,6 @@ export default function AppNavigator() {
                   cardStyleInterpolator: immersiveFadeInterpolator,
                 }}
               />
-              {/* NOUVELLE ROUTE AJOUTÉE ICI */}
               <Stack.Screen name="MyResources" component={MyResourcesScreen} />
             </>
           )}

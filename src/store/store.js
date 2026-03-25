@@ -1,4 +1,5 @@
 // src/store/store.js
+
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { apiSlice } from './slices/apiSlice';
@@ -18,24 +19,12 @@ const rootReducer = (state, action) => {
   return appReducer(state, action);
 };
 
-const createOrGetStore = () => {
-  if (global.__REDUX_STORE__) {
-    global.__REDUX_STORE__.replaceReducer(rootReducer);
-    return global.__REDUX_STORE__;
-  }
-
-  const newStore = configureStore({
-    reducer: rootReducer,
-    middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware({
-        serializableCheck: false,
-      }).concat(apiSlice.middleware),
-  });
-
-  global.__REDUX_STORE__ = newStore;
-  return newStore;
-};
-
-export const store = createOrGetStore();
+export const store = configureStore({
+  reducer: rootReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: false,
+    }).concat(apiSlice.middleware),
+});
 
 setupListeners(store.dispatch);

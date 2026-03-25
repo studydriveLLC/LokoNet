@@ -3,7 +3,6 @@ import { apiSlice } from '../slices/apiSlice';
 
 export const resourceApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    // NOUVEAU : Récupérer mes propres ressources
     getMyResources: builder.query({
       query: () => ({ url: '/v1/resources/me' }),
       transformResponse: (response) => response.data?.resources || [],
@@ -108,6 +107,25 @@ export const resourceApiSlice = apiSlice.injectEndpoints({
         }
       }
     }),
+
+    // NOUVEAU : Mutation pour gerer le compteur de partages
+    logShare: builder.mutation({
+      query: (id) => ({ url: `/v1/resources/${id}/share`, method: 'PATCH' }),
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          resourceApiSlice.util.updateQueryData('getResources', { page: 1, limit: 20 }, (draft) => {
+            const resource = draft.find(r => String(r._id) === String(id));
+            // Mise a jour optimiste du compteur pour eviter la latence UI
+            if (resource) resource.shares = (resource.shares || 0) + 1;
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      }
+    }),
     
     deleteResource: builder.mutation({
       query: (id) => ({ url: `/v1/resources/${id}`, method: 'DELETE' }),
@@ -145,6 +163,7 @@ export const {
   useUploadResourceMutation,
   useLogViewMutation,
   useLogDownloadMutation,
+  useLogShareMutation,
   useDeleteResourceMutation,
   useUpdateResourceMutation,
   useToggleFavoriteMutation,
