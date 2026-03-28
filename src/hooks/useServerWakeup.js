@@ -1,8 +1,9 @@
 // src/hooks/useServerWakeup.js
-// HOOK DE SURVIE RESEAU - Confiance stricte .env & Detection 404
+// HOOK DE SURVIE RESEAU - Synchronisation Socket.io & Route LokoNet V1
 // CSCSM Level: Bank Grade
 
 import { useEffect, useRef, useState } from 'react';
+import socketService from '../services/socketService';
 
 const useServerWakeup = () => {
   const [isServerReady, setIsServerReady] = useState(false);
@@ -13,16 +14,29 @@ const useServerWakeup = () => {
     let isMounted = true;
     let retryTimer = null;
     
-    // Utilisation STRICTE de l'URL du fichier .env, sans aucune modification arbitraire
+    // Bypass absolu : Si le Socket est connecte, le backend est deja operationnel
+    if (socketService.isConnected) {
+       setIsServerReady(true);
+       return;
+    }
+
     const baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const healthUrl = `${cleanBaseUrl}/health`;
+    // LokoNet exige le prefixe /v1 pour ses routes
+    const healthUrl = `${cleanBaseUrl}/v1/health`;
 
     const pingServer = async () => {
       if (!isMounted) return;
+      
+      // Seconde verification au cas ou le Socket se connecte pendant le delai
+      if (socketService.isConnected) {
+        setIsServerReady(true);
+        setIsWakingUp(false);
+        return;
+      }
+
       attemptRef.current += 1;
 
-      // SECURITE ANTI-BLOCAGE : Forcage apres 3 echecs pour ne pas bloquer l'UI
       if (attemptRef.current > 3) {
         if (isMounted) {
           setIsServerReady(true);
@@ -31,7 +45,6 @@ const useServerWakeup = () => {
         return;
       }
 
-      // Timeout court : on veut juste savoir si la machine repond
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
 
@@ -43,8 +56,6 @@ const useServerWakeup = () => {
 
         clearTimeout(timeoutId);
 
-        // HACK STRATEGIQUE : Si le serveur repond 404, c'est que la route n'existe pas,
-        // mais cela PROUVE que le conteneur Render est allume et actif !
         if (response.ok || response.status === 404) {
           if (isMounted) {
             setIsServerReady(true);

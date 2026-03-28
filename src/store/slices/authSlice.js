@@ -168,7 +168,7 @@ export const fetchPromoConfig = () => async (dispatch, getState) => {
     const baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 
-    const response = await fetch(`${cleanBaseUrl}/subscription/config`, {
+    const response = await fetch(`${cleanBaseUrl}/v1/subscription/config`, {
       headers: { 'Authorization': `Bearer ${auth.token}`, 'Accept': 'application/json' }
     });
 
@@ -217,7 +217,7 @@ export const forceSilentRefresh = () => async (dispatch, getState) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    const response = await fetch(`${cleanBaseUrl}/auth/refresh`, {
+    const response = await fetch(`${cleanBaseUrl}/v1/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ 

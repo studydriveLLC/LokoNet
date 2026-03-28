@@ -1,8 +1,19 @@
-//src/components/profile/UserProfileHero.jsx
+// src/components/profile/UserProfileHero.jsx
+// COMPOSANT HERO - Profil Utilisateur (Couverture Interactive & Haptics)
+// CSCSM Level: Bank Grade
+
 import React from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, Vibration } from 'react-native';
-import Animated, { interpolate, Extrapolation, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { 
+  interpolate, 
+  Extrapolation, 
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
+import * as Haptics from 'expo-haptics';
+
 import { useAppTheme } from '../../theme/theme';
 import RoleBadge from '../ui/RoleBadge';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -22,6 +33,9 @@ export default function UserProfileHero({ profile, scrollY, onAvatarPress, postC
   const isFollower = statusData?.data?.isFollower || false;
   const isActionLoading = isFollowing || isUnfollowing;
 
+  // Shared value pour l'interaction avec la couverture
+  const coverPressState = useSharedValue(0);
+
   const handleToggleFollow = async () => {
     if (isActionLoading || isStatusLoading || !profile?._id) return;
     Vibration.vibrate(40); 
@@ -31,12 +45,29 @@ export default function UserProfileHero({ profile, scrollY, onAvatarPress, postC
     } catch (error) {}
   };
 
+  const handleCoverPressIn = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    coverPressState.value = withTiming(1, { duration: 300 });
+  };
+
+  const handleCoverPressOut = () => {
+    coverPressState.value = withTiming(0, { duration: 500 });
+  };
+
   const coverAnimatedStyle = useAnimatedStyle(() => {
-    // FIX STRICT: Remplacement du chainage optionnel par une evaluation stricte pour le worklet
     const sv = (scrollY && scrollY.value !== undefined) ? scrollY.value : 0;
     const translateY = interpolate(sv, [-100, 0, 100], [-50, 0, 50], Extrapolation.CLAMP);
     const scale = interpolate(sv, [-100, 0], [1.5, 1], Extrapolation.CLAMP);
     return { transform: [{ translateY }, { scale }] };
+  });
+
+  const coverOverlayStyle = useAnimatedStyle(() => {
+    // Interpolation d'opacite pour un changement de couleur natif et 100% fluide (60fps)
+    const opacity = interpolate(coverPressState.value, [0, 1], [0, 0.5]);
+    return {
+      opacity,
+      backgroundColor: theme.colors.primary
+    };
   });
 
   const coverUrl = profile.cover || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=1000&auto=format&fit=crop';
@@ -44,9 +75,15 @@ export default function UserProfileHero({ profile, scrollY, onAvatarPress, postC
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.coverContainer, { backgroundColor: theme.colors.primaryLight }]}>
+      
+      <Pressable 
+        onPressIn={handleCoverPressIn}
+        onPressOut={handleCoverPressOut}
+        style={[styles.coverContainer, { backgroundColor: theme.colors.primaryLight }]}
+      >
         <Animated.Image source={{ uri: coverUrl }} style={[styles.cover, coverAnimatedStyle]} />
-      </View>
+        <Animated.View style={[StyleSheet.absoluteFill, coverOverlayStyle]} pointerEvents="none" />
+      </Pressable>
       
       <View style={styles.content}>
         <Pressable 
@@ -94,7 +131,7 @@ export default function UserProfileHero({ profile, scrollY, onAvatarPress, postC
                 style={[styles.followButton, { backgroundColor: isFollowed ? 'transparent' : theme.colors.primary, borderColor: isFollowed ? theme.colors.border : theme.colors.primary }]} 
                 onPress={handleToggleFollow}
               >
-                {isActionLoading ? <ActivityIndicator color={isFollowed ? theme.colors.text : '#fff'} /> : <Text style={[styles.followText, { color: isFollowed ? theme.colors.text : '#fff' }]}>{isFollowed ? "Abonné" : (isFollower ? "Suivre en retour" : "S'abonner")}</Text>}
+                {isActionLoading ? <ActivityIndicator color={isFollowed ? theme.colors.text : '#fff'} /> : <Text style={[styles.followText, { color: isFollowed ? theme.colors.text : '#fff' }]}>{isFollowed ? "Abonne" : (isFollower ? "Suivre en retour" : "S'abonner")}</Text>}
               </Pressable>
               <Pressable style={[styles.messageButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
                 <Text style={[styles.messageText, { color: theme.colors.text }]}>Message</Text>
