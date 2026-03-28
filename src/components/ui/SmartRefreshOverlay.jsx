@@ -1,19 +1,24 @@
-//src/components/ui/SmartRefreshOverlay.jsx
+// src/components/ui/SmartRefreshOverlay.jsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useAppTheme } from '../../theme/theme';
+import useServerWakeup from '../../hooks/useServerWakeup';
 
 export default function SmartRefreshOverlay({ isVisible }) {
   const theme = useAppTheme();
+  const { isWakingUp } = useServerWakeup();
   const [fadeAnim] = useState(new Animated.Value(0));
   const [dots, setDots] = useState('');
   
-  const [isRendered, setIsRendered] = useState(isVisible);
+  // L'overlay reste affiché si on lui demande explicitement OU si le serveur est en train de se réveiller
+  const effectiveIsVisible = isVisible || isWakingUp;
+
+  const [isRendered, setIsRendered] = useState(effectiveIsVisible);
 
   useEffect(() => {
     let interval;
-    if (isVisible) {
+    if (effectiveIsVisible) {
       setIsRendered(true);
       
       Animated.timing(fadeAnim, {
@@ -39,7 +44,7 @@ export default function SmartRefreshOverlay({ isVisible }) {
     }
 
     return () => clearInterval(interval);
-  }, [isVisible, fadeAnim]);
+  }, [effectiveIsVisible, fadeAnim]);
 
   if (!isRendered) {
     return null;
@@ -49,6 +54,9 @@ export default function SmartRefreshOverlay({ isVisible }) {
   
   // 'default' offre souvent le meilleur compromis de réfraction sur Android
   const blurTint = isDarkMode ? 'dark' : 'default';
+
+  // Texte adaptatif en fonction de l'état du serveur
+  const baseText = isWakingUp ? "Réveil du serveur" : "Actualisation";
 
   return (
     <Animated.View 
@@ -71,7 +79,7 @@ export default function SmartRefreshOverlay({ isVisible }) {
       <View style={styles.content}>
         <View style={styles.loaderCard}>
           <Text style={[styles.text, { color: theme.colors.primary }]}>
-            Actualisation{dots}
+            {baseText}{dots}
           </Text>
         </View>
       </View>

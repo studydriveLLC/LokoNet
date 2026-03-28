@@ -1,30 +1,41 @@
-//src/store/slices/authSlice.js
+// src/store/slices/authSlice.js
+// GESTION SESSION - SECURISATION PII & FONCTIONS PURES REDUX
+// CSCSM Level: Bank Grade
 
 import { createSlice } from '@reduxjs/toolkit';
-import { saveToken, deleteToken, getToken } from '../secureStoreAdapter';
-
-const rawBaseUrl = process.env.EXPO_PUBLIC_API_URL || '';
-const API_URL = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+import { Platform } from 'react-native';
+import socketService from '../../services/socketService';
+import SecureStorageAdapter from '../secureStoreAdapter';
 
 const initialState = {
   user: null,
   token: null,
   refreshToken: null,
-  tokenAcquiredAt: null,
+  tokenAcquiredAt: null, 
   isAuthenticated: false,
-  isLoading: true,
-  isTokenRefreshing: false,
+  isRefreshing: false, 
+  subscriptionStatus: {
+    isActive: false,
+    isPending: false,
+    isRejected: false,
+    rejectionReason: null,
+    expiresAt: null
+  },
+  promoMode: {
+    isActive: false,
+    message: ""
+  }
 };
 
 const safeStorageSet = (key, value) => {
-  Promise.resolve(saveToken(key, value)).catch(err => {
-    console.warn(`[Redux] Echec de sauvegarde pour ${key}:`, err);
+  Promise.resolve(SecureStorageAdapter.setItem(key, value)).catch(err => {
+    console.error(`[Redux] Echec de sauvegarde pour ${key}:`, err);
   });
 };
 
 const safeStorageRemove = (key) => {
-  Promise.resolve(deleteToken(key)).catch(err => {
-    console.warn(`[Redux] Echec de suppression pour ${key}:`, err);
+  Promise.resolve(SecureStorageAdapter.removeItem(key)).catch(err => {
+    console.error(`[Redux] Echec de suppression pour ${key}:`, err);
   });
 };
 
@@ -33,80 +44,152 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setCredentials: (state, action) => {
-      const { user, token, refreshToken } = action.payload;
-      
-      if (user !== undefined) state.user = user;
-      if (token !== undefined) {
-        state.token = token;
-        state.tokenAcquiredAt = Date.now();
-      }
-      if (refreshToken !== undefined) state.refreshToken = refreshToken;
-      
-      state.isAuthenticated = !!state.token;
-      state.isLoading = false;
+      const { user, accessToken, token, refreshToken } = action.payload || {};
+      const finalToken = accessToken || token;
 
-      if (state.token) safeStorageSet('accessToken', state.token);
-      if (state.refreshToken) safeStorageSet('refreshToken', state.refreshToken);
-      if (state.user) safeStorageSet('userData', JSON.stringify(state.user));
-    },
-    restoreAuth: (state, action) => {
-      const { user, token, refreshToken } = action.payload || {};
-      state.user = user || null;
-      state.token = token || null;
-      state.refreshToken = refreshToken || null;
-      
-      state.tokenAcquiredAt = 0; 
-      state.isAuthenticated = !!state.token;
-      state.isLoading = false;
-    },
-    updateUser: (state, action) => {
-      if (state.user) {
-        state.user = { ...state.user, ...action.payload };
-        safeStorageSet('userData', JSON.stringify(state.user));
+      if (!user && !finalToken && !refreshToken) {
+        console.warn('[Redux] Donnees de connexion incompletes');
       }
+
+      if (user) {
+        state.user = user;
+        if (user.subscription && typeof user.subscription === 'object') {
+          state.subscriptionStatus = {
+            ...state.subscriptionStatus,
+            isActive: user.subscription.isActive || false,
+            isPending: user.subscription.isPending || false,
+            expiresAt: user.subscription.expiresAt || null
+          };
+        }
+      }
+
+      if (finalToken) {
+        state.token = finalToken;
+        state.tokenAcquiredAt = Date.now(); 
+      }
+      
+      if (refreshToken) state.refreshToken = refreshToken;
+      
+      state.isAuthenticated = !!state.token;
+
+      if (state.user) safeStorageSet('userInfo', JSON.stringify(state.user));
+      if (state.token) safeStorageSet('token', state.token);
+      if (state.refreshToken) safeStorageSet('refreshToken', state.refreshToken);
     },
-    logout: (state) => {
+    
+    updateUserInfo: (state, action) => {
+      if (!state.user) return;
+      state.user = { 
+        ...state.user, 
+        ...action.payload,
+        subscription: action.payload.subscription !== undefined ? action.payload.subscription : state.user.subscription
+      };
+
+      if (action.payload.subscription) {
+        state.subscriptionStatus = {
+          ...state.subscriptionStatus,
+          isActive: action.payload.subscription.isActive || false,
+          isPending: action.payload.subscription.isPending || false,
+          isRejected: action.payload.subscription.isPending ? false : state.subscriptionStatus.isRejected,
+          expiresAt: action.payload.subscription.expiresAt || null
+        };
+      }
+      safeStorageSet('userInfo', JSON.stringify(state.user));
+    },
+
+    updateSubscriptionStatus: (state, action) => {
+      state.subscriptionStatus = { ...state.subscriptionStatus, ...action.payload };
+    },
+
+    updatePromoMode: (state, action) => {
+      state.promoMode = {
+        isActive: action.payload.isGlobalFreeAccess || false,
+        message: action.payload.promoMessage || "Yely Regal ! Mode VIP Active."
+      };
+    },
+
+    logout: (state, action) => {
+      const reason = action.payload?.reason || 'USER_INITIATED';
+      console.warn(`[AUTH] Deconnexion declenchee. Raison: ${reason}`);
+
       state.user = null;
       state.token = null;
       state.refreshToken = null;
-      state.tokenAcquiredAt = null;
+      state.tokenAcquiredAt = null; 
       state.isAuthenticated = false;
-      state.isLoading = false;
-      state.isTokenRefreshing = false;
-
-      safeStorageRemove('accessToken');
+      state.isRefreshing = false;
+      state.subscriptionStatus = { isActive: false, isPending: false, isRejected: false, rejectionReason: null, expiresAt: null };
+      
+      safeStorageRemove('userInfo');
+      safeStorageRemove('token');
       safeStorageRemove('refreshToken');
-      safeStorageRemove('userData');
     },
-    setAuthLoading: (state, action) => {
-      state.isLoading = action.payload;
+
+    restoreAuth: (state, action) => {
+      const { user, token, refreshToken } = action.payload || {};
+      state.user = user || null;
+      state.token = token;
+      state.refreshToken = refreshToken;
+      
+      state.tokenAcquiredAt = 0; 
+      state.isAuthenticated = !!token;
+      
+      if (user && user.subscription && typeof user.subscription === 'object') {
+        state.subscriptionStatus = {
+          ...state.subscriptionStatus,
+          isActive: user.subscription.isActive || false,
+          isPending: user.subscription.isPending || false,
+          expiresAt: user.subscription.expiresAt || null
+        };
+      }
     },
-    setTokenRefreshing: (state, action) => {
-      state.isTokenRefreshing = action.payload;
+
+    setRefreshing: (state, action) => {
+      state.isRefreshing = action.payload;
     }
   },
 });
 
-export const { setCredentials, restoreAuth, updateUser, logout, setAuthLoading, setTokenRefreshing } = authSlice.actions;
+export const { 
+  setCredentials, 
+  updateUserInfo, 
+  updateSubscriptionStatus,
+  updatePromoMode,
+  logout, 
+  restoreAuth, 
+  setRefreshing 
+} = authSlice.actions;
 
-export const performLogout = () => async (dispatch) => {
-  dispatch(logout());
-  
-  const { apiSlice } = require('./apiSlice');
-  dispatch(apiSlice.util.resetApiState());
+export const fetchPromoConfig = () => async (dispatch, getState) => {
+  const { auth } = getState();
+  if (!auth.token) return null;
 
   try {
-    const socketService = require('../../services/socketService').default;
-    socketService.disconnect();
-  } catch (e) {
-    console.warn("[AUTH] Erreur deconnexion socket", e);
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
+    const response = await fetch(`${cleanBaseUrl}/subscription/config`, {
+      headers: { 'Authorization': `Bearer ${auth.token}`, 'Accept': 'application/json' }
+    });
+
+    const result = await response.json();
+    if (response.ok && result?.data) {
+      dispatch(updatePromoMode({
+        isGlobalFreeAccess: result.data.isGlobalFreeAccess,
+        promoMessage: result.data.promoMessage
+      }));
+      return result.data; 
+    }
+  } catch (error) {
+    console.warn("[AUTH] Impossible de synchroniser la config VIP au demarrage/login");
   }
+  return null;
 };
 
 export const forceSilentRefresh = () => async (dispatch, getState) => {
   const { auth } = getState();
 
-  if (auth.isTokenRefreshing) return;
+  if (auth.isRefreshing) return;
 
   if (auth.token && auth.tokenAcquiredAt) {
     const ageInMs = Date.now() - auth.tokenAcquiredAt;
@@ -115,27 +198,32 @@ export const forceSilentRefresh = () => async (dispatch, getState) => {
     }
   }
 
-  dispatch(setTokenRefreshing(true));
+  dispatch(setRefreshing(true)); 
 
   try {
     let currentRefreshToken = auth.refreshToken;
     if (!currentRefreshToken) {
-       currentRefreshToken = await getToken('refreshToken');
+       currentRefreshToken = await SecureStorageAdapter.getItem('refreshToken');
     }
 
     if (!currentRefreshToken) {
-      dispatch(setTokenRefreshing(false));
+      dispatch(setRefreshing(false));
       return;
     }
 
-    const controller = new AbortController();
-    // Augmentation du timeout à 60s pour anticiper le cold start de Render
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 
-    const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    const response = await fetch(`${cleanBaseUrl}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ refreshToken: currentRefreshToken }),
+      body: JSON.stringify({ 
+        refreshToken: currentRefreshToken,
+        clientPlatform: Platform.OS
+      }),
       credentials: 'omit',
       signal: controller.signal
     });
@@ -143,34 +231,43 @@ export const forceSilentRefresh = () => async (dispatch, getState) => {
     clearTimeout(timeoutId);
     const result = await response.json().catch(() => null);
 
-    if (response.ok && result?.status === 'success') {
-      const newToken = result.data.accessToken;
-      const newRefreshToken = result.data.refreshToken || currentRefreshToken;
+    if (response.ok && result?.success) {
+      const payload = result.data || result;
+      const newAccessToken = payload.accessToken || payload.token;
+      const newRefreshToken = payload.refreshToken || currentRefreshToken;
 
-      dispatch(setCredentials({
-        user: auth.user,
-        token: newToken,
-        refreshToken: newRefreshToken
-      }));
-
-      try {
-        const socketService = require('../../services/socketService').default;
-        socketService.updateToken(newToken);
-      } catch (e) {}
-
+      if (newAccessToken) {
+        socketService.updateToken(newAccessToken);
+        dispatch(setCredentials({
+          user: payload.user || auth.user,
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken
+        }));
+        
+        dispatch(fetchPromoConfig());
+      }
     } else if (response.status === 401 || response.status === 403) {
       const currentAuth = getState().auth;
       if (currentAuth.tokenAcquiredAt !== auth.tokenAcquiredAt) {
         console.info('[AUTH] Race condition evitee silencieusement : apiSlice a pris le relais.');
       } else {
-        dispatch(performLogout());
+        socketService.disconnect();
+        dispatch(logout({ reason: 'WAKEUP_REFRESH_REJECTED' }));
       }
     }
   } catch (error) {
-    console.warn("[AUTH] Echec reseau du rafraichissement silencieux. Session conservee:", error.message);
+    console.error("[AUTH] Echec reseau du rafraichissement force. Session conservee:", error);
   } finally {
-    dispatch(setTokenRefreshing(false));
+    dispatch(setRefreshing(false)); 
   }
 };
 
 export default authSlice.reducer;
+
+export const selectCurrentUser = (state) => state.auth.user;
+export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
+export const selectUserRole = (state) => state.auth.user?.role;
+export const selectToken = (state) => state.auth.token;
+export const selectIsRefreshing = (state) => state.auth.isRefreshing;
+export const selectSubscriptionStatus = (state) => state.auth.subscriptionStatus;
+export const selectPromoMode = (state) => state.auth.promoMode;
